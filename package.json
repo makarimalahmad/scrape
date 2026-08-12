@@ -1,0 +1,19 @@
+{
+  "name": "scrap",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "scrape": "node scrape.js",
+    "compare:url": "node compare-url.js",
+    "search:top": "node search-top-and-scrape.js",
+    "test": "node --check scrape.js && node --check compare-url.js && node --check search-top-and-scrape.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}

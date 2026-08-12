@@ -1,0 +1,16 @@
+node_modules/
+.browser-profile/
+output/
+logs/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.csv
+Mobile Legends/
+Free Fire/
+Roblox/
+other/
+.DS_Store
+Thumbs.db
