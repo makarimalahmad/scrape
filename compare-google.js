@@ -361,6 +361,26 @@ async function processGame(apiKey, gameConfig, options) {
   };
 }
 
+function createOverallSummary(summaries, generatedAt) {
+  const successfulGameCount = summaries.filter((summary) => summary.success).length;
+  return {
+    success: successfulGameCount === summaries.length,
+    generatedAt,
+    gameCount: summaries.length,
+    successfulGameCount,
+    failedGameCount: summaries.length - successfulGameCount,
+    comparisonFileCount: summaries.reduce(
+      (total, summary) => total + (summary.comparisonFileCount || 0),
+      0,
+    ),
+    comparisonCount: summaries.reduce(
+      (total, summary) => total + (summary.comparisonCount || 0),
+      0,
+    ),
+    games: summaries,
+  };
+}
+
 async function main() {
   const apiKey = process.env.SERPAPI_KEY;
   if (!apiKey) throw new Error("SERPAPI_KEY belum diatur.");
@@ -372,13 +392,15 @@ async function main() {
   const gameId = getArgument("game");
   if (!gameId) {
     throw new Error(
-      "Pilih game dengan --game mobile-legends, --game free-fire, atau --game roblox.",
+      "Pilih game dengan --game all, mobile-legends, free-fire, atau roblox.",
     );
   }
-  const selectedGame = GAME_CONFIGS.find((game) => game.id === gameId);
-  if (!selectedGame) {
+  const selectedGames = gameId === "all"
+    ? GAME_CONFIGS
+    : GAME_CONFIGS.filter((game) => game.id === gameId);
+  if (!selectedGames.length) {
     throw new Error(
-      `Game tidak valid: ${gameId}. Pilih mobile-legends, free-fire, atau roblox.`,
+      `Game tidak valid: ${gameId}. Pilih all, mobile-legends, free-fire, atau roblox.`,
     );
   }
 
@@ -387,45 +409,56 @@ async function main() {
   const maxAttempts = Number.isInteger(attemptsValue)
     ? Math.min(5, Math.max(1, attemptsValue))
     : 3;
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const generatedAt = new Date().toISOString();
+  const timestamp = generatedAt.replace(/[:.]/g, "-");
   const date = timestamp.slice(0, 10);
-  const outputDirectory = path.resolve(
+  const comparisonDirectory = path.resolve(
     __dirname,
     "output",
     date,
     "comparison",
-    selectedGame.id,
-    timestamp,
   );
-  fs.mkdirSync(outputDirectory, { recursive: true });
+  const runDirectory = path.join(comparisonDirectory, gameId, timestamp);
+  fs.mkdirSync(runDirectory, { recursive: true });
 
   const summaries = [];
-  for (const gameConfig of [selectedGame]) {
+  for (const gameConfig of selectedGames) {
+    const outputDirectory = gameId === "all"
+      ? path.join(runDirectory, gameConfig.id)
+      : runDirectory;
+    fs.mkdirSync(outputDirectory, { recursive: true });
     try {
-      summaries.push(
-        await processGame(apiKey, gameConfig, {
-          limit,
-          headed,
-          maxAttempts,
-          timestamp,
-          outputDirectory,
-        }),
-      );
+      const summary = await processGame(apiKey, gameConfig, {
+        limit,
+        headed,
+        maxAttempts,
+        timestamp,
+        outputDirectory,
+      });
+      summaries.push({ success: true, ...summary });
     } catch (error) {
       summaries.push({
+        success: false,
         game: gameConfig.name,
         query: gameConfig.query,
+        comparisonFileCount: 0,
+        comparisonCount: 0,
         error: error.message,
       });
       console.error(`Gagal ${gameConfig.name}: ${error.message}`);
     }
   }
 
+  const overallSummary = createOverallSummary(summaries, generatedAt);
   const summaryPath = path.join(
-    outputDirectory,
-    `summary-${selectedGame.id}-${timestamp}.json`,
+    runDirectory,
+    `summary-${gameId}-${timestamp}.json`,
   );
-  fs.writeFileSync(summaryPath, JSON.stringify(summaries, null, 2), "utf8");
+  fs.writeFileSync(
+    summaryPath,
+    JSON.stringify(overallSummary, null, 2),
+    "utf8",
+  );
 
   console.table(
     summaries.map((summary) => ({
@@ -440,7 +473,7 @@ async function main() {
   );
   console.log(`Summary: ${summaryPath}`);
 
-  if (summaries.some((summary) => summary.error)) process.exitCode = 1;
+  if (!overallSummary.success) process.exitCode = 1;
 }
 
 if (require.main === module) {
@@ -451,6 +484,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  createOverallSummary,
   createPairFileName,
   createPairRows,
   describeStatus,

@@ -5,6 +5,7 @@ const {
   selectCheapestProducts,
 } = require("./product-matcher");
 const {
+  createOverallSummary,
   createPairFileName,
   createPairRows,
   describeStatus,
@@ -191,6 +192,40 @@ async function testScrapeRetry() {
   assert.strictEqual(getRetryDelay(4), 30_000);
 }
 
+function testOverallSummary() {
+  const summary = createOverallSummary(
+    [
+      {
+        success: true,
+        game: "Mobile Legends",
+        comparisonFileCount: 4,
+        comparisonCount: 100,
+      },
+      {
+        success: false,
+        game: "Free Fire",
+        comparisonFileCount: 0,
+        comparisonCount: 0,
+        error: "Semua situs utama gagal",
+      },
+      {
+        success: true,
+        game: "Roblox",
+        comparisonFileCount: 3,
+        comparisonCount: 25,
+      },
+    ],
+    "2026-08-14T08:00:00.000Z",
+  );
+
+  assert.strictEqual(summary.success, false);
+  assert.strictEqual(summary.gameCount, 3);
+  assert.strictEqual(summary.successfulGameCount, 2);
+  assert.strictEqual(summary.failedGameCount, 1);
+  assert.strictEqual(summary.comparisonFileCount, 7);
+  assert.strictEqual(summary.comparisonCount, 125);
+}
+
 function testComparisonStatus() {
   const status = describeStatus(
     { quantity: 34, price: 12910 },
@@ -209,6 +244,7 @@ async function main() {
   testAllProductsIncluded();
   testTemporaryScrapeErrors();
   await testScrapeRetry();
+  testOverallSummary();
   testComparisonStatus();
   console.log("Google comparison tests passed.");
 }

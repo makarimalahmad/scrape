@@ -19,18 +19,16 @@ mkdir -p "$APP_DIR/output" "$APP_DIR/logs"
 
 echo "===== Mulai $(date --iso-8601=seconds) ====="
 
-EXIT_CODE=0
-for game in mobile-legends free-fire roblox; do
-  echo "===== Game $game ====="
-  /usr/bin/xvfb-run \
-    -a \
-    -s "-screen 0 1920x1080x24" \
-    /usr/bin/node \
-    compare-google.js \
-    --game "$game" \
-    --attempts "$ATTEMPTS" \
-    --headed || EXIT_CODE=1
-done
+/usr/bin/xvfb-run \
+  -a \
+  -s "-screen 0 1920x1080x24" \
+  /usr/bin/node \
+  compare-google.js \
+  --game all \
+  --attempts "$ATTEMPTS" \
+  --headed
+
+EXIT_CODE=$?
 
 echo "===== Selesai $(date --iso-8601=seconds), exit $EXIT_CODE ====="
 
