@@ -1,6 +1,7 @@
 node_modules/
 .browser-profile/
 output/
+output-vps/
 logs/
 playwright-report/
 test-results/
@@ -12,5 +13,7 @@ Mobile Legends/
 Free Fire/
 Roblox/
 other/
+*-bckp.js
+*.bak
 .DS_Store
 Thumbs.db

@@ -2,6 +2,7 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline/promises");
+const { validateScrapeResults } = require("./validate-results");
 
 function getArgument(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
@@ -41,6 +42,183 @@ function createOutputName(url) {
   return `${domain}-${timestamp}`;
 }
 
+async function extractKiosgamerRows(page) {
+  const apiUrl =
+    "https://kiosgamer.co.id/api/shop/apps/channels?app_id=100067&region=CO.ID&language=id";
+  const response = await page.request.get(apiUrl);
+  if (!response.ok()) return [];
+
+  const data = await response.json();
+  const qrisChannel = data.channels?.find((channel) => channel.name === "QRIS");
+  if (!qrisChannel?.items) return [];
+
+  return qrisChannel.items
+    .filter((item) => item.app_point_amount > 0 || item.rebate_card?.name)
+    .map((item) => ({
+      Produk: item.rebate_card?.name || `${item.app_point_amount} Diamonds`,
+      Harga: `Rp ${Number(item.currency_amount).toLocaleString("id-ID")}`,
+    }));
+}
+
+async function extractGopayRows(page) {
+  return page.locator('[id^="variant-"] .grid > div').evaluateAll((cards) =>
+    cards.map((card) => {
+      const product = card.querySelector("h3")?.innerText?.trim();
+      const prices = card.innerText?.match(/Rp\s*[\d.]+/gi) || [];
+      return { Produk: product, Harga: prices[0] };
+    }),
+  );
+}
+
+async function extractRobloxRows(page) {
+  return page.locator("[data-product-id]").evaluateAll((cards) =>
+    cards.map((card) => {
+      const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
+      const amounts = text.match(/^([\d.]+)(?:\s+[\d.]+)?/);
+      const priceMatch = text.match(/Rp\s*([\d.,]+)\s*(rb|jt)?/i);
+      if (!amounts || !priceMatch) return {};
+
+      let price = Number(priceMatch[1].replace(/\./g, "").replace(",", "."));
+      if (/^rb$/i.test(priceMatch[2] || "")) price *= 1_000;
+      if (/^jt$/i.test(priceMatch[2] || "")) price *= 1_000_000;
+      return {
+        Produk: `${amounts[1].replace(/\./g, "")} Robux`,
+        Harga: `Rp ${Math.round(price).toLocaleString("id-ID")}`,
+      };
+    }),
+  );
+}
+
+async function extractEbelanjaRows(page) {
+  const showMore = page.getByRole("button", { name: /Muat Lainnya/i });
+  for (let attempt = 0; attempt < 10 && await showMore.count(); attempt += 1) {
+    if (!await showMore.isVisible().catch(() => false)) break;
+    await showMore.click().catch(() => {});
+    await page.waitForTimeout(500);
+  }
+
+  const cards = page.locator(".box-border.cursor-pointer");
+  return cards.evaluateAll((elements) =>
+    elements.map((card) => {
+      const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
+      const product = text
+        .replace(/^PROMO\s*/i, "")
+        .split(/Rp\s*[\d.]+/i)[0]
+        .trim();
+      const price = text.match(/Rp\s*[\d.]+/i)?.[0];
+      return { Produk: product, Harga: price };
+    }),
+  );
+}
+
+async function extractShopeeRows(page) {
+  const rows = [];
+  const productPicker = page.getByText(/Pilih Nominal (?:Roblox|Free Fire)/i, {
+    exact: true,
+  }).first();
+  if (await productPicker.count()) {
+    await productPicker.click().catch(() => {});
+    await page.waitForTimeout(500);
+    const optionRows = await page.locator("li").evaluateAll((options) =>
+      options.map((option) => {
+        const text = option.innerText?.replace(/\s+/g, " ").trim() || "";
+        const product = text.match(
+          /(?:Rp[\d.]+,-\s+Roblox Gift Card|\d[\d.]*\s+Diamonds?)/i,
+        )?.[0];
+        const prices = text.match(/Rp\s*[\d.]+/gi) || [];
+        return { Produk: product, Harga: prices[prices.length - 1] };
+      }),
+    );
+    rows.push(...optionRows.filter((row) => row.Produk && row.Harga));
+  }
+
+  if (rows.length) return rows;
+
+  const bodyText = await page.locator("body").innerText();
+  const diamondSection = bodyText.match(
+    /Jumlah Diamond\s+Harga([\s\S]*?)(?:Untuk membeli item|Cara\s+redeem)/i,
+  )?.[1];
+  if (!diamondSection) return [];
+
+  const diamondPattern = /(\d[\d.]*)\s+Diamonds?\s+(Rp\s*[\d.]+)/gi;
+  for (const match of diamondSection.matchAll(diamondPattern)) {
+    rows.push({ Produk: `${match[1]} Diamonds`, Harga: match[2] });
+  }
+  return rows;
+}
+
+async function extractDitusiRows(page) {
+  const bodyText = await page.locator("body").innerText();
+  const markerMatches = Array.from(
+    bodyText.matchAll(/Pilih Item Top Up (?:Free Fire|Roblox - Login)/gi),
+  );
+  const marker = markerMatches.at(-1);
+  if (!marker) return [];
+  const section = bodyText.slice(marker.index + marker[0].length);
+
+  const rows = [];
+  const lines = section.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const productPattern = /^\d[\d.]*\s+(?:Diamonds?|Robux)(?:\s*\+\s*\(Bonus\s+\d[\d.]*\))?$/i;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!productPattern.test(lines[index])) continue;
+
+    const prices = [];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      if (productPattern.test(lines[next])) break;
+      if (/^RM\b/i.test(lines[next])) break;
+      if (/^Rp\.?\s*[\d.]+$/i.test(lines[next])) prices.push(lines[next]);
+    }
+    if (prices.length) {
+      rows.push({ Produk: lines[index], Harga: prices[prices.length - 1] });
+    }
+  }
+  return rows;
+}
+
+async function extractVexagameRows(page) {
+  return page.locator('#diamond-cards [role="option"]').evaluateAll((cards) =>
+    cards.map((card) => {
+      const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
+      const prices = text.match(/Rp\s*[\d.]+/gi) || [];
+      const product = card.querySelector("p")?.innerText?.trim();
+      return { Produk: product, Harga: prices[prices.length - 1] };
+    }),
+  );
+}
+
+async function extractUnipinRobloxRows(page) {
+  const bodyText = await page.locator("body").innerText();
+  const section = bodyText.match(
+    /Pilih Jumlah([\s\S]*?)(?:Pilih Saluran Pembayaran|Checkout)/i,
+  )?.[1];
+  if (!section) return [];
+
+  const rows = [];
+  const pattern = /Rp([\d.]+),?-?\s+Roblox Gift Card\s+IDR\s*([\d.]+)/gi;
+  for (const match of section.matchAll(pattern)) {
+    rows.push({
+      Produk: `Roblox IDR ${match[1]}`,
+      Harga: `IDR ${match[2]}`,
+    });
+  }
+  return rows;
+}
+
+async function extractSpecialRows(page, url) {
+  const hostname = url.hostname.replace(/^www\./, "");
+  if (hostname === "roblox.com") return extractRobloxRows(page);
+  if (hostname === "kiosgamer.co.id") return extractKiosgamerRows(page);
+  if (hostname === "gopay.co.id") return extractGopayRows(page);
+  if (hostname === "topup.ebelanja.id") return extractEbelanjaRows(page);
+  if (hostname === "shopee.co.id") return extractShopeeRows(page);
+  if (hostname === "ditusi.co.id") return extractDitusiRows(page);
+  if (hostname === "vexagame.com") return extractVexagameRows(page);
+  if (hostname === "unipin.com" && /roblox/i.test(url.pathname)) {
+    return extractUnipinRobloxRows(page);
+  }
+  return null;
+}
+
 async function scrape(url, selector, headed) {
   const browser = await chromium.launch({ headless: !headed });
   const page = await browser.newPage({ locale: "id-ID" });
@@ -60,6 +238,23 @@ async function scrape(url, selector, headed) {
     }
     await page.waitForTimeout(5_000);
     await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
+
+    if (
+      url.hostname.endsWith("gopay.co.id") &&
+      url.pathname.includes("/games/blog/")
+    ) {
+      const productLink = page.locator('a[href*="/games/"]').filter({
+        hasText: /Top Up (?:Robux|Roblox) Sekarang/i,
+      }).first();
+      const productUrl = await productLink.getAttribute("href").catch(() => null);
+      if (productUrl) {
+        await page.goto(new URL(productUrl, url.href).href, {
+          waitUntil: "domcontentloaded",
+          timeout: 90_000,
+        });
+        await page.waitForTimeout(5_000);
+      }
+    }
 
     const blockedPattern =
       /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
@@ -148,6 +343,8 @@ async function scrape(url, selector, headed) {
         .catch(() => {});
     }
 
+    const specialRows = await extractSpecialRows(page, url);
+
     let danaRows = null;
     if (url.hostname.endsWith("dana.id")) {
       danaRows = [];
@@ -181,6 +378,14 @@ async function scrape(url, selector, headed) {
       }
     }
 
+    if (url.hostname.endsWith("lootbar.com")) {
+      const closeCoupon = page.locator("button.dialog-coupon-close");
+      if (await closeCoupon.count()) {
+        await closeCoupon.click().catch(() => {});
+        await page.waitForTimeout(1_000);
+      }
+    }
+
     if (url.hostname.endsWith("mobapay.com")) {
       const expandButton = page.locator(".mobapay-scroll-recharge-arrow").first();
       if (await expandButton.count()) {
@@ -211,7 +416,7 @@ async function scrape(url, selector, headed) {
     });
     await page.waitForTimeout(2_000);
 
-    const rows = danaRows || await page.evaluate(
+    const rows = specialRows || danaRows || await page.evaluate(
       ({ defaultSelector, hostname, pathname }) => {
         const priceRegex =
           /(?:(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d[\d.,]*)|(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?)/gi;
@@ -247,6 +452,8 @@ async function scrape(url, selector, headed) {
           pathname.includes("roblox-voucher");
         const isItemku = hostname.endsWith("itemku.com");
         const isDana = hostname.endsWith("dana.id");
+        const isLootbar = hostname.endsWith("lootbar.com");
+        const isGogogo = hostname.endsWith("gogogo.id");
         const productSelector = hostname.endsWith("upoint.id")
           ? ".cursor-pointer"
           : isDuniaGamesRoblox
@@ -255,7 +462,11 @@ async function scrape(url, selector, headed) {
               ? ".grid > .h-full > .group.cursor-pointer"
               : isDana
                 ? "button.product-detail-v3-package__item"
-                : '.pDRoot, .mobapay-recharge-item, [class*="recharge-item"], [class*="product-card"], .form-check-label-rounded-lg, [class*="group/variant"], .sku-card, .highlighted-sku-card, .denom-container > button';
+                : isLootbar
+                  ? "li.topup-list-con-item"
+                  : isGogogo
+                    ? '[data-testid^="qa-product-item-card-container-"]'
+                    : '.pDRoot, .mobapay-recharge-item, [class*="recharge-item"], [class*="product-card"], .form-check-label-rounded-lg, [class*="group/variant"], .sku-card, .highlighted-sku-card, .denom-container > button';
         let productCards = [];
         try {
           productCards = Array.from(document.querySelectorAll(productSelector));
@@ -286,6 +497,11 @@ async function scrape(url, selector, headed) {
           const isItemkuCard = isItemku && card.matches(".group.cursor-pointer");
           const isDanaCard =
             isDana && card.matches("button.product-detail-v3-package__item");
+          const isLootbarCard =
+            isLootbar && card.matches("li.topup-list-con-item");
+          const isGogogoCard =
+            isGogogo &&
+            card.matches('[data-testid^="qa-product-item-card-container-"]');
           const upointParts = isUpointCard ? text.split(/\bfrom\b/i) : [];
           const upointPrice = isUpointCard
             ? upointParts.slice(1).join(" ").match(priceRegex)?.[0]
@@ -305,16 +521,39 @@ async function scrape(url, selector, headed) {
           const danaName = isDanaCard
             ? clean(card.querySelector(".title")?.innerText)
             : "";
+          const lootbarName = isLootbarCard
+            ? clean(card.querySelector(".topup-name")?.innerText)
+            : "";
+          const lootbarPrice = isLootbarCard
+            ? clean(card.querySelector(".discount-price")?.innerText)
+            : null;
+          const gogogoName = isGogogoCard
+            ? clean(
+              card.querySelector('[data-testid^="qa-product-item-card-name-"]')
+                ?.innerText,
+            )
+            : "";
+          const gogogoPrice = isGogogoCard
+            ? clean(
+              card.querySelector(
+                '[data-testid^="qa-product-item-card-current-price-"]',
+              )?.innerText,
+            )
+            : null;
           const effectivePrice = isMobapayCard || isDuniaGamesCard
             ? prices[prices.length - 1]
-            : danaPrice || itemkuPrice || robloxTransactionPrice || upointPrice || prices[0];
+            : gogogoPrice || lootbarPrice || danaPrice || itemkuPrice || robloxTransactionPrice || upointPrice || prices[0];
           let name = isUpointCard
             ? upointParts[0].trim()
             : isDuniaGamesCard
               ? duniaGamesName
               : isDanaCard
                 ? danaName
-                : isItemkuCard && itemkuPrice
+                : isLootbarCard
+                  ? lootbarName
+                  : isGogogoCard
+                    ? gogogoName
+                    : isItemkuCard && itemkuPrice
                   ? text.slice(0, text.lastIndexOf(itemkuPrice)).trim()
                   : isRobloxStoreCard && robloxTransactionPrice
                     ? text.slice(0, text.lastIndexOf(robloxTransactionPrice)).trim()
@@ -324,7 +563,9 @@ async function scrape(url, selector, headed) {
             !isDuniaGamesCard &&
             !isRobloxStoreCard &&
             !isItemkuCard &&
-            !isDanaCard
+            !isDanaCard &&
+            !isLootbarCard &&
+            !isGogogoCard
           ) {
             prices.forEach((p) => {
               name = name.replace(p, "");
@@ -451,6 +692,20 @@ function exportCsv(rows, output) {
   return csvPath;
 }
 
+function saveInvalidReport(output, url, validation, rows) {
+  const reportPath = path.resolve(`${output}.invalid.json`);
+  const report = {
+    url: url.href,
+    checkedAt: new Date().toISOString(),
+    validation,
+    sample: rows.slice(0, 10),
+  };
+
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), "utf8");
+  return reportPath;
+}
+
 async function main() {
   const url = validateUrl(await getUrl());
   const selector = getArgument(
@@ -461,9 +716,21 @@ async function main() {
   const headed = process.argv.includes("--headed");
 
   const rows = await scrape(url, selector, headed);
-  const filePath = exportCsv(rows, output);
+  const validation = validateScrapeResults(url.href, rows);
+
   console.table(rows);
-  console.log(`Berhasil mengambil ${rows.length} data.`);
+  console.log(`Confidence data: ${validation.confidence}/100.`);
+
+  if (!validation.valid) {
+    const reportPath = saveInvalidReport(output, url, validation, rows);
+    const reasons = validation.reasons.join(", ");
+    throw new Error(
+      `${validation.status}: ${reasons}. CSV tidak dibuat. Laporan: ${reportPath}`,
+    );
+  }
+
+  const filePath = exportCsv(rows, output);
+  console.log(`Berhasil mengambil ${rows.length} data valid.`);
   console.log(`File CSV: ${filePath}`);
 }
 
@@ -474,4 +741,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { scrape, validateUrl, exportCsv };
+module.exports = {
+  exportCsv,
+  saveInvalidReport,
+  scrape,
+  validateUrl,
+};

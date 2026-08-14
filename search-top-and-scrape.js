@@ -40,7 +40,26 @@ function runScraper(url, outputName, headed) {
     });
 
     child.once("error", reject);
-    child.once("close", (code) => resolve(code));
+    child.once("close", (exitCode) => {
+      const invalidReportPath = `${outputName}.invalid.json`;
+      if (!fs.existsSync(invalidReportPath)) {
+        resolve({ exitCode, status: exitCode === 0 ? "VALID" : "SCRAPE_GAGAL" });
+        return;
+      }
+
+      try {
+        const report = JSON.parse(fs.readFileSync(invalidReportPath, "utf8"));
+        resolve({
+          exitCode,
+          status: report.validation?.status || "DATA_TIDAK_VALID",
+          confidence: report.validation?.confidence,
+          reasons: report.validation?.reasons,
+          invalidReport: invalidReportPath,
+        });
+      } catch {
+        resolve({ exitCode, status: "DATA_TIDAK_VALID" });
+      }
+    });
   });
 }
 
@@ -145,14 +164,15 @@ async function main() {
 
     console.log(`\nScrape rank ${result.position}: ${result.link}`);
     try {
-      const exitCode = await runScraper(result.link, outputName, headed);
+      const scrapeResult = await runScraper(result.link, outputName, headed);
       scrapingResults.push({
         position: result.position,
         title: result.title,
         link: result.link,
-        success: exitCode === 0,
-        exitCode,
-        expectedCsv: `${outputName}.csv`,
+        success: scrapeResult.exitCode === 0,
+        ...scrapeResult,
+        expectedCsv:
+          scrapeResult.exitCode === 0 ? `${outputName}.csv` : undefined,
       });
     } catch (error) {
       scrapingResults.push({
