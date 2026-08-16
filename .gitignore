@@ -2,6 +2,8 @@ node_modules/
 .browser-profile/
 output/
 output-vps/
+output-vps-new/
+backup/
 logs/
 playwright-report/
 test-results/
@@ -14,6 +16,8 @@ Free Fire/
 Roblox/
 other/
 *-bckp.js
+*-bckup.js
+debug-ff-new.js
 *.bak
 .DS_Store
 Thumbs.db

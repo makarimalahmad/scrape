@@ -8,10 +8,13 @@ function parseCount(value) {
 }
 
 function normalizeGame(game) {
-  const value = String(game || "").toLowerCase();
-  if (value.includes("free")) return "free-fire";
-  if (value.includes("roblox")) return "roblox";
-  return "mobile-legends";
+  const value = String(game || "").toLowerCase().trim();
+  if (["free-fire", "free fire", "ff"].includes(value)) return "free-fire";
+  if (["roblox", "robux"].includes(value)) return "roblox";
+  if (["mobile-legends", "mobile legends", "mlbb", "ml"].includes(value)) {
+    return "mobile-legends";
+  }
+  return "unknown";
 }
 
 function parseNamedProduct(name) {
@@ -119,13 +122,14 @@ function parseDiamondProduct(name) {
 
 function parseProduct(name, game) {
   const cleanName = String(name || "").toLowerCase().trim();
-  const namedProduct = parseNamedProduct(cleanName);
-  if (namedProduct) return namedProduct;
+  const normalizedGame = normalizeGame(game);
 
-  if (normalizeGame(game) === "roblox") {
+  if (normalizedGame === "roblox") {
     const robloxProduct = parseRobloxProduct(cleanName);
     if (robloxProduct) return robloxProduct;
-  } else {
+  } else if (["mobile-legends", "free-fire"].includes(normalizedGame)) {
+    const namedProduct = parseNamedProduct(cleanName);
+    if (namedProduct) return namedProduct;
     const diamondProduct = parseDiamondProduct(cleanName);
     if (diamondProduct) return diamondProduct;
   }
@@ -143,7 +147,7 @@ function selectCheapestProducts(rows, game) {
   for (const row of rows) {
     const parsed = parseProduct(row.Produk, game);
     const price = parsePrice(row.Harga);
-    if (!parsed.key || price === null) continue;
+    if (!parsed.key || parsed.category === "other" || price === null) continue;
 
     const mapKey = `${parsed.category}|${parsed.key}`;
     const current = products.get(mapKey);

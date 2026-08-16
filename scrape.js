@@ -1,8 +1,11 @@
-const { chromium } = require("playwright");
+const { chromium } = require("./playwright");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline/promises");
 const { validateScrapeResults } = require("./validate-results");
+
+const DEFAULT_SELECTOR =
+  '.denom, article, li, label, button, [role="radio"], [class*="product"], [class*="item"], [class*="card"], [class*="denom"]';
 
 function getArgument(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
@@ -42,6 +45,40 @@ function createOutputName(url) {
   return `${domain}-${timestamp}`;
 }
 
+function parseUPointCardText(text) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  const match = cleanText.match(/^(.+?)\s+from\s+(\d{1,3}(?:\.\d{3})+)$/i);
+  if (!match || Number(match[2].replace(/\./g, "")) <= 0) return null;
+  return { Produk: match[1].trim(), Harga: `Rp ${match[2]}` };
+}
+
+function parseDuniaGamesCardText(text, productName) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  const product = String(productName || "").replace(/\s+/g, " ").trim();
+  const prices = cleanText.match(/\b\d{1,3}(?:\.\d{3})+\b/g) || [];
+  const price = prices.at(-1);
+  if (!product || !price || Number(price.replace(/\./g, "")) <= 0) return null;
+  return { Produk: product, Harga: `Rp ${price}` };
+}
+
+function parseUniPinCardText(text) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  const price = cleanText.match(/\bIDR\s*(\d[\d.]*)\b/i);
+  if (!price || Number(price[1].replace(/\./g, "")) <= 0) return null;
+  const product = cleanText.slice(0, price.index).trim();
+  if (!product || /^total$/i.test(product)) return null;
+  return { Produk: product, Harga: `IDR ${price[1]}` };
+}
+
+function normalizeMobapayProductName(name, pathname) {
+  const product = String(name || "").replace(/\s+/g, " ").trim();
+  if (!/\/mlbb(?:\/|$)/i.test(pathname)) return product;
+  if (/^\d[\d.,]*(?:\s*\+\s*\d[\d.,]*)?$/.test(product)) {
+    return `${product} Diamonds`;
+  }
+  return product;
+}
+
 async function extractKiosgamerRows(page) {
   const apiUrl =
     "https://kiosgamer.co.id/api/shop/apps/channels?app_id=100067&region=CO.ID&language=id";
@@ -58,6 +95,53 @@ async function extractKiosgamerRows(page) {
       Produk: item.rebate_card?.name || `${item.app_point_amount} Diamonds`,
       Harga: `Rp ${Number(item.currency_amount).toLocaleString("id-ID")}`,
     }));
+}
+
+async function extractUPointRows(page) {
+  return page.locator(".cursor-pointer").evaluateAll((cards) =>
+    cards
+      .map((card) => card.innerText?.replace(/\s+/g, " ").trim() || "")
+      .map((text) => {
+        const match = text.match(/^(.+?)\s+from\s+(\d{1,3}(?:\.\d{3})+)$/i);
+        if (!match || Number(match[2].replace(/\./g, "")) <= 0) return null;
+        return { Produk: match[1].trim(), Harga: `Rp ${match[2]}` };
+      })
+      .filter(Boolean),
+  );
+}
+
+async function extractDuniaGamesRows(page) {
+  return page.locator(".denom").evaluateAll((cards) =>
+    cards
+      .map((card) => {
+        const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
+        const product = card.querySelector(".head-dnm")?.innerText
+          ?.replace(/\s+/g, " ")
+          .trim();
+        const prices = text.match(/\b\d{1,3}(?:\.\d{3})+\b/g) || [];
+        const price = prices.at(-1);
+        if (!product || !price || Number(price.replace(/\./g, "")) <= 0) {
+          return null;
+        }
+        return { Produk: product, Harga: `Rp ${price}` };
+      })
+      .filter(Boolean),
+  );
+}
+
+async function extractUniPinRows(page) {
+  return page.locator(".denom-container > button").evaluateAll((cards) =>
+    cards
+      .map((card) => {
+        const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
+        const price = text.match(/\bIDR\s*(\d[\d.]*)\b/i);
+        if (!price || Number(price[1].replace(/\./g, "")) <= 0) return null;
+        const product = text.slice(0, price.index).trim();
+        if (!product || /^total$/i.test(product)) return null;
+        return { Produk: product, Harga: `IDR ${price[1]}` };
+      })
+      .filter(Boolean),
+  );
 }
 
 async function extractGopayRows(page) {
@@ -116,9 +200,18 @@ async function extractShopeeRows(page) {
   const productPicker = page.getByText(/Pilih Nominal (?:Roblox|Free Fire)/i, {
     exact: true,
   }).first();
-  if (await productPicker.count()) {
+  const pickerReady = await productPicker
+    .waitFor({ state: "visible", timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (pickerReady) {
     await productPicker.click().catch(() => {});
-    await page.waitForTimeout(500);
+    await page
+      .locator("li")
+      .filter({ hasText: /Roblox Gift Card|Diamonds?/i })
+      .first()
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .catch(() => {});
     const optionRows = await page.locator("li").evaluateAll((options) =>
       options.map((option) => {
         const text = option.innerText?.replace(/\s+/g, " ").trim() || "";
@@ -206,6 +299,11 @@ async function extractUnipinRobloxRows(page) {
 
 async function extractSpecialRows(page, url) {
   const hostname = url.hostname.replace(/^www\./, "");
+  if (hostname === "upoint.id") return extractUPointRows(page);
+  if (hostname === "duniagames.co.id") return extractDuniaGamesRows(page);
+  if (hostname === "unipin.com" && !/roblox/i.test(url.pathname)) {
+    return extractUniPinRows(page);
+  }
   if (hostname === "roblox.com") return extractRobloxRows(page);
   if (hostname === "kiosgamer.co.id") return extractKiosgamerRows(page);
   if (hostname === "gopay.co.id") return extractGopayRows(page);
@@ -219,11 +317,76 @@ async function extractSpecialRows(page, url) {
   return null;
 }
 
-async function scrape(url, selector, headed) {
-  const browser = await chromium.launch({ headless: !headed });
-  const page = await browser.newPage({ locale: "id-ID" });
+async function createOptimizedContext(browser) {
+  return browser.newContext({ locale: "id-ID" });
+}
+
+async function triggerTurnstileCheckbox(page) {
+  const iframe = page.locator('iframe[src*="challenges.cloudflare.com"]');
+  if (!(await iframe.count())) return false;
+
+  const checkbox = page
+    .frameLocator('iframe[src*="challenges.cloudflare.com"]')
+    .locator('input[type="checkbox"]');
+  const visible = await checkbox
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!visible) return false;
+
+  await page.waitForTimeout(1_500 + Math.random() * 1_000);
+  await checkbox.click({ delay: 100 + Math.random() * 150 });
+  return true;
+}
+
+async function waitForProductData(page, timeout = 20_000, hostname = "") {
+  const domain = hostname.replace(/^www\./, "");
+  const readinessSelectors = {
+    "upoint.id": ".cursor-pointer",
+    "duniagames.co.id": ".denom",
+    "unipin.com": ".denom-container > button",
+  };
+  const readinessSelector = readinessSelectors[domain];
+  if (readinessSelector) {
+    const ready = await page
+      .locator(readinessSelector)
+      .filter({ hasText: /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|\b[1-9]\d{0,2}(?:\.\d{3})+)\b/i })
+      .first()
+      .waitFor({ state: "visible", timeout })
+      .then(() => true)
+      .catch(() => false);
+    if (ready) return true;
+  }
+
+  return page
+    .waitForFunction(
+      () => {
+        const text = document.body?.innerText || "";
+        const challengeVisible = /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i.test(
+          text,
+        );
+        const hasPrice = /(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d/i.test(text);
+        const hasProduct = /(?:diamond|\bdm\b|pass|pack|card|member|membership|robux|voucher|\buc\b|point|token|crystal|gold|coin|credit)/i.test(
+          text,
+        );
+        return !challengeVisible && hasPrice && hasProduct;
+      },
+      null,
+      { timeout, polling: 500 },
+    )
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function scrape(url, selector, headed, options = {}) {
+  const ownsBrowser = !options.browser;
+  const browser = options.browser || await chromium.launch({ headless: !headed });
+  let context = null;
 
   try {
+    context = await createOptimizedContext(browser);
+    const page = await context.newPage();
     let response;
     try {
       response = await page.goto(url.href, {
@@ -236,25 +399,7 @@ async function scrape(url, selector, headed) {
       }
       throw error;
     }
-    await page.waitForTimeout(5_000);
-    await page.locator("body").waitFor({ state: "visible", timeout: 30_000 });
-
-    if (
-      url.hostname.endsWith("gopay.co.id") &&
-      url.pathname.includes("/games/blog/")
-    ) {
-      const productLink = page.locator('a[href*="/games/"]').filter({
-        hasText: /Top Up (?:Robux|Roblox) Sekarang/i,
-      }).first();
-      const productUrl = await productLink.getAttribute("href").catch(() => null);
-      if (productUrl) {
-        await page.goto(new URL(productUrl, url.href).href, {
-          waitUntil: "domcontentloaded",
-          timeout: 90_000,
-        });
-        await page.waitForTimeout(5_000);
-      }
-    }
+    await page.locator("body").waitFor({ state: "visible", timeout: 15_000 });
 
     const blockedPattern =
       /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
@@ -265,38 +410,42 @@ async function scrape(url, selector, headed) {
     };
 
     if (response?.status() === 403 || (await pageShowsChallenge())) {
-      if (!headed) {
-        throw new Error(
-          "Situs menampilkan verifikasi Cloudflare. Jalankan ulang dengan --headed untuk menyelesaikan CAPTCHA manual.",
+      await triggerTurnstileCheckbox(page).catch(() => false);
+
+      if (await pageShowsChallenge()) {
+        if (!headed) {
+          throw new Error(
+            "Situs menampilkan verifikasi Cloudflare. Jalankan ulang dengan --headed untuk menyelesaikan CAPTCHA manual.",
+          );
+        }
+
+        console.log(
+          `Selesaikan CAPTCHA untuk ${url.hostname}. Scraper lanjut otomatis setelah halaman produk terbuka...`,
         );
-      }
 
-      console.log(
-        "Selesaikan CAPTCHA di browser. Scraper lanjut otomatis setelah halaman produk terbuka...",
-      );
+        const challengePassed = await page
+          .waitForFunction(
+            () => {
+              const text = `${document.title}\n${document.body?.innerText || ""}`;
+              return !/sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i.test(
+                text,
+              );
+            },
+            null,
+            { timeout: 180_000 },
+          )
+          .then(() => true)
+          .catch(() => false);
 
-      const challengePassed = await page
-        .waitForFunction(
-          () => {
-            const text = `${document.title}\n${document.body?.innerText || ""}`;
-            return !/sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i.test(
-              text,
-            );
-          },
-          null,
-          { timeout: 180_000 },
-        )
-        .then(() => true)
-        .catch(() => false);
-
-      if (!challengePassed || (await pageShowsChallenge())) {
-        throw new Error(
-          "Verifikasi Cloudflare tidak selesai dalam 3 menit. Coba ganti jaringan atau jalankan ulang beberapa saat lagi.",
-        );
+        if (!challengePassed || (await pageShowsChallenge())) {
+          throw new Error(
+            "Verifikasi Cloudflare tidak selesai dalam 3 menit. Coba ganti jaringan atau jalankan ulang beberapa saat lagi.",
+          );
+        }
       }
 
       console.log("Cloudflare lolos. Menunggu produk dimuat...");
-      await page.waitForTimeout(5_000);
+      await waitForProductData(page, 30_000, url.hostname);
     }
 
     if (/ourastore\.com$|bangjeff\.com$/i.test(url.hostname)) {
@@ -328,22 +477,11 @@ async function scrape(url, selector, headed) {
         );
       }
     } else {
-      await page
-        .waitForFunction(
-          () => {
-            const text = document.body?.innerText || "";
-            return (
-              /(?:Rp\.?|IDR)\s*\d/i.test(text) &&
-              /(?:diamond|pass|pack)/i.test(text)
-            );
-          },
-          null,
-          { timeout: 30_000 },
-        )
-        .catch(() => {});
+      await waitForProductData(page, 20_000, url.hostname);
     }
 
-    const specialRows = await extractSpecialRows(page, url);
+    let specialRows = await extractSpecialRows(page, url);
+    if (!specialRows?.length) specialRows = null;
 
     let danaRows = null;
     if (url.hostname.endsWith("dana.id")) {
@@ -376,6 +514,7 @@ async function scrape(url, selector, headed) {
           danaRows.push(row);
         }
       }
+      if (!danaRows.length) danaRows = null;
     }
 
     if (url.hostname.endsWith("lootbar.com")) {
@@ -404,25 +543,26 @@ async function scrape(url, selector, headed) {
     }
 
     await page.evaluate(async () => {
-      for (
-        let position = 0;
-        position < document.body.scrollHeight;
-        position += 700
-      ) {
-        window.scrollTo(0, position);
-        await new Promise((resolve) => setTimeout(resolve, 150));
+      let previousHeight = 0;
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const currentHeight = document.body.scrollHeight;
+        window.scrollTo(0, currentHeight);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        if (currentHeight === previousHeight) break;
+        previousHeight = currentHeight;
       }
       window.scrollTo(0, 0);
     });
-    await page.waitForTimeout(2_000);
+    await page.waitForTimeout(300);
 
-    const rows = specialRows || danaRows || await page.evaluate(
+    const rows = specialRows ?? danaRows ?? await page.evaluate(
       ({ defaultSelector, hostname, pathname }) => {
         const priceRegex =
-          /(?:(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d[\d.,]*)|(?:\d{1,3}(?:\.\d{3})+(?:,\d+)?)/gi;
+          /(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d[\d.,]*/gi;
         const clean = (str) => str?.replace(/\s+/g, " ").trim() || "";
         const results = [];
         const seen = new Set();
+        let selectorValid = true;
 
         const noisePattern =
           /^(?:potongan penuh|hemat|biaya admin|harga awal|gimcashback|memakai|kirim pesanan|10% s\.d\.|4\.9|min\.?$)/i;
@@ -583,14 +723,24 @@ async function scrape(url, selector, headed) {
             )
             .replace(/\s+/g, " ")
             .trim();
+          if (
+            isMobapayCard &&
+            /\/mlbb(?:\/|$)/i.test(pathname) &&
+            /^\d[\d.,]*(?:\s*\+\s*\d[\d.,]*)?$/.test(name)
+          ) {
+            name = `${name} Diamonds`;
+          }
 
           if (name) pushRow(name, effectivePrice);
         }
 
         if (!results.length) {
-          const elements = Array.from(
-            document.querySelectorAll(defaultSelector),
-          );
+          let elements = [];
+          try {
+            elements = Array.from(document.querySelectorAll(defaultSelector));
+          } catch {
+            selectorValid = false;
+          }
           for (const element of elements) {
             const text = clean(element.innerText);
             if (!text || text.length > 180) continue;
@@ -607,9 +757,13 @@ async function scrape(url, selector, headed) {
           }
         }
 
+        if (!selectorValid) {
+          throw new Error("Selector kartu produk tidak valid.");
+        }
+
         if (!results.length) {
           const linePriceRegex =
-            /^(?:(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d[\d.,]*|\d{1,3}(?:\.\d{3})+(?:,\d+)?)$/i;
+            /^(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d[\d.,]*$/i;
           const lines = (document.body.innerText || "")
             .split("\n")
             .map(clean)
@@ -667,7 +821,8 @@ async function scrape(url, selector, headed) {
       Sumber: url.href,
     }));
   } finally {
-    await browser.close();
+    if (context) await context.close().catch(() => {});
+    if (ownsBrowser) await browser.close().catch(() => {});
   }
 }
 
@@ -708,10 +863,7 @@ function saveInvalidReport(output, url, validation, rows) {
 
 async function main() {
   const url = validateUrl(await getUrl());
-  const selector = getArgument(
-    "selector",
-    '.denom, article, li, label, button, [role="radio"], [class*="product"], [class*="item"], [class*="card"], [class*="denom"]',
-  );
+  const selector = getArgument("selector", DEFAULT_SELECTOR);
   const output = getArgument("output", createOutputName(url));
   const headed = process.argv.includes("--headed");
 
@@ -742,7 +894,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  DEFAULT_SELECTOR,
   exportCsv,
+  normalizeMobapayProductName,
+  parseDuniaGamesCardText,
+  parseUniPinCardText,
+  parseUPointCardText,
   saveInvalidReport,
   scrape,
   validateUrl,

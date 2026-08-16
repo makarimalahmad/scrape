@@ -53,6 +53,15 @@ function isRelevantProduct(value) {
   return PRODUCT_PATTERN.test(product) || NUMERIC_PACKAGE_PATTERN.test(product);
 }
 
+function isProductRelevantForGame(value, game) {
+  const product = String(value || "").replace(/\s+/g, " ").trim();
+  if (!game) return isRelevantProduct(product);
+  if (game === "roblox") return /robux|roblox|gift\s*card|\bidr\b|\busd\b/i.test(product);
+  return /diamond|\bdm\b|pass|pack|bundle|membership|member|starlight|twilight|weekly|monthly/i.test(
+    product,
+  );
+}
+
 function isNoiseProduct(value) {
   const product = String(value || "").replace(/\s+/g, " ").trim();
   return NOISE_PATTERN.test(product);
@@ -62,11 +71,11 @@ function ratio(part, total) {
   return total === 0 ? 0 : part / total;
 }
 
-function calculateStats(rows) {
+function calculateStats(rows, game = null) {
   const totalRows = rows.length;
   const validPriceCount = rows.filter((row) => isValidPrice(row.Harga)).length;
   const relevantProductCount = rows.filter((row) =>
-    isRelevantProduct(row.Produk),
+    isProductRelevantForGame(row.Produk, game),
   ).length;
   const noiseCount = rows.filter((row) => isNoiseProduct(row.Produk)).length;
   const uniqueCount = new Set(
@@ -130,10 +139,10 @@ function validateUnknownDomain(stats, confidence) {
   return reasons;
 }
 
-function validateScrapeResults(url, rows) {
+function validateScrapeResults(url, rows, game = null) {
   const hostname = normalizeHostname(url);
   const knownDomain = isKnownDomain(hostname);
-  const stats = calculateStats(rows);
+  const stats = calculateStats(rows, game);
   const confidence = calculateConfidence(stats);
   const reasons = knownDomain
     ? validateKnownDomain(stats, confidence)
@@ -159,6 +168,7 @@ module.exports = {
   calculateStats,
   isKnownDomain,
   isNoiseProduct,
+  isProductRelevantForGame,
   isRelevantProduct,
   isValidPrice,
   validateScrapeResults,

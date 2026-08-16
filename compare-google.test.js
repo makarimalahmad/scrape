@@ -7,11 +7,16 @@ const {
 const {
   createOverallSummary,
   createPairFileName,
+  createScrapeFileName,
   createPairRows,
   describeStatus,
   getRetryDelay,
   isTemporaryScrapeError,
+  isTopUpCompetitorResult,
+  mapWithConcurrency,
   scrapeWithRetry,
+  searchGoogle,
+  selectGoogleCompetitors,
 } = require("./compare-google");
 const { GAME_CONFIGS, isMainStoreUrl } = require("./compare-google-config");
 
@@ -38,6 +43,134 @@ function testMainStoresExcludedFromRanking() {
   );
 }
 
+function testTopUpCompetitorFiltering() {
+  const freeFire = GAME_CONFIGS.find((game) => game.id === "free-fire");
+  const roblox = GAME_CONFIGS.find((game) => game.id === "roblox");
+
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "https://www.youtube.com/watch?v=example",
+        title: "Top Up Free Fire Termurah",
+        snippet: "Beli diamond Free Fire",
+      },
+      freeFire,
+    ),
+    false,
+  );
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "https://www.instagram.com/storegame/",
+        title: "Top Up Roblox",
+        snippet: "Jual Robux murah",
+      },
+      roblox,
+    ),
+    false,
+  );
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "https://example.com/blog/cara-main-free-fire",
+        title: "Cara Bermain Free Fire",
+        snippet: "Panduan pemula dan berita game",
+      },
+      freeFire,
+    ),
+    false,
+  );
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "https://eraspace.com/artikel/post/6-cara-top-up-roblox",
+        title: "6 Cara Top Up Roblox yang Perlu Diketahui",
+        snippet: "Harga Robux dan panduan membeli voucher",
+      },
+      roblox,
+    ),
+    false,
+  );
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "https://www.codashop.com/id-id/free-fire",
+        title: "Top Up Free Fire",
+        snippet: "Beli diamond Free Fire",
+      },
+      freeFire,
+    ),
+    true,
+  );
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "https://itemku.com/games/roblox",
+        title: "Jual Robux Roblox Termurah",
+        snippet: "Beli Robux dan Roblox gift card",
+      },
+      roblox,
+    ),
+    true,
+  );
+  assert.strictEqual(
+    isTopUpCompetitorResult(
+      {
+        link: "javascript:alert(1)",
+        title: "Top Up Roblox",
+      },
+      roblox,
+    ),
+    false,
+  );
+}
+
+async function testGoogleRankingSelection() {
+  const game = GAME_CONFIGS.find((entry) => entry.id === "roblox");
+  const organicResults = [
+    {
+      title: "Cara Top Up Roblox",
+      link: "https://example.com/blog/cara-top-up-roblox",
+    },
+    {
+      position: 2,
+      title: "Top Up Roblox Store A",
+      link: "https://store-a.example/roblox/top-up",
+    },
+    {
+      position: 3,
+      title: "Top Up Roblox Store A Lain",
+      link: "https://www.store-a.example/roblox/voucher",
+    },
+    {
+      position: 4,
+      title: "Beli Robux Store B",
+      link: "https://store-b.example/games/roblox",
+    },
+  ];
+  const selected = selectGoogleCompetitors(organicResults, game, 2);
+  assert.deepStrictEqual(
+    selected.ranking.map((result) => result.position),
+    [2, 4],
+  );
+
+  let requestedUrl;
+  const result = await searchGoogle("token", game, 2, async (url) => {
+    requestedUrl = new URL(url);
+    return {
+      ok: true,
+      json: async () => ({ organic_results: organicResults }),
+    };
+  });
+  assert.strictEqual(Number(requestedUrl.searchParams.get("num")), 20);
+  assert.strictEqual(result.ranking.length, 2);
+  assert.strictEqual(result.rankingAudit.organicResultCount, 4);
+  assert.strictEqual(
+    result.rankingAudit.decisions[0].classification,
+    "editorial_page",
+  );
+}
+
 function testProductParsing() {
   assert.strictEqual(
     parseProduct("31+3 Diamonds", "mobile-legends").quantity,
@@ -56,6 +189,11 @@ function testProductParsing() {
     parseProduct("50.000 IDR - Gift Card", "roblox").key,
   );
   assert.strictEqual(parseProduct("800 Robux", "roblox").key, "800 Robux");
+  assert.strictEqual(
+    parseProduct("Weekly Diamond Pass", "roblox").category,
+    "other",
+  );
+  assert.strictEqual(parseProduct("800 Robux", "pubg").category, "other");
   assert.strictEqual(
     parseProduct("400 Robux + (Bonus 100)", "roblox").key,
     "500 Robux",
@@ -125,6 +263,14 @@ function testPairRowsAndFileName() {
     createPairFileName(mainStore, competitor),
     "rank-01-upoint-vs-codashop-com",
   );
+  assert.strictEqual(
+    createScrapeFileName({ name: "UPoint", position: "Utama" }),
+    "main-upoint",
+  );
+  assert.strictEqual(
+    createScrapeFileName({ store: "mobapay.com", position: 8 }),
+    "rank-08-mobapay-com",
+  );
 }
 
 function testAllProductsIncluded() {
@@ -169,6 +315,13 @@ function testTemporaryScrapeErrors() {
     isTemporaryScrapeError(new Error("SITUS_BELUM_DIDUKUNG")),
     false,
   );
+  const retryableValidationError = new Error("DATA_TIDAK_VALID");
+  retryableValidationError.retryable = true;
+  assert.strictEqual(isTemporaryScrapeError(retryableValidationError), true);
+  assert.strictEqual(
+    isTemporaryScrapeError(new Error("Data harga tidak ditemukan")),
+    true,
+  );
 }
 
 async function testScrapeRetry() {
@@ -187,9 +340,24 @@ async function testScrapeRetry() {
   );
 
   assert.strictEqual(callCount, 3);
-  assert.deepStrictEqual(delays, [5_000, 10_000]);
+  assert.deepStrictEqual(delays, [2_000, 4_000]);
   assert.strictEqual(rows.length, 1);
-  assert.strictEqual(getRetryDelay(4), 30_000);
+  assert.strictEqual(getRetryDelay(4), 15_000);
+}
+
+async function testConcurrencyLimit() {
+  let activeWorkers = 0;
+  let maximumWorkers = 0;
+  const results = await mapWithConcurrency([1, 2, 3, 4, 5], 2, async (value) => {
+    activeWorkers += 1;
+    maximumWorkers = Math.max(maximumWorkers, activeWorkers);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    activeWorkers -= 1;
+    return value * 2;
+  });
+
+  assert.deepStrictEqual(results, [2, 4, 6, 8, 10]);
+  assert.strictEqual(maximumWorkers, 2);
 }
 
 function testOverallSummary() {
@@ -200,12 +368,19 @@ function testOverallSummary() {
         game: "Mobile Legends",
         comparisonFileCount: 4,
         comparisonCount: 100,
+        scrapes: [
+          { type: "main", name: "DuniaGames", url: "https://dg.example", success: true },
+          { type: "competitor", name: "Store A", url: "https://a.example", success: false },
+        ],
       },
       {
         success: false,
         game: "Free Fire",
         comparisonFileCount: 0,
         comparisonCount: 0,
+        scrapes: [
+          { type: "main", name: "UPoint", url: "https://up.example", success: false },
+        ],
         error: "Semua situs utama gagal",
       },
       {
@@ -213,17 +388,26 @@ function testOverallSummary() {
         game: "Roblox",
         comparisonFileCount: 3,
         comparisonCount: 25,
+        scrapes: [
+          { type: "competitor", name: "Store B", url: "https://b.example", success: true },
+        ],
       },
     ],
     "2026-08-14T08:00:00.000Z",
   );
 
   assert.strictEqual(summary.success, false);
+  assert.strictEqual(summary.status, "PARTIAL");
   assert.strictEqual(summary.gameCount, 3);
   assert.strictEqual(summary.successfulGameCount, 2);
   assert.strictEqual(summary.failedGameCount, 1);
   assert.strictEqual(summary.comparisonFileCount, 7);
   assert.strictEqual(summary.comparisonCount, 125);
+  assert.strictEqual(summary.allScrapesSuccessful, false);
+  assert.strictEqual(summary.scrapeCount, 4);
+  assert.strictEqual(summary.successfulScrapeCount, 2);
+  assert.strictEqual(summary.failedScrapeCount, 2);
+  assert.strictEqual(summary.scrapes[0].game, "Mobile Legends");
 }
 
 function testComparisonStatus() {
@@ -238,12 +422,15 @@ function testComparisonStatus() {
 async function main() {
   testGameConfiguration();
   testMainStoresExcludedFromRanking();
+  testTopUpCompetitorFiltering();
+  await testGoogleRankingSelection();
   testProductParsing();
   testProximityMatching();
   testPairRowsAndFileName();
   testAllProductsIncluded();
   testTemporaryScrapeErrors();
   await testScrapeRetry();
+  await testConcurrencyLimit();
   testOverallSummary();
   testComparisonStatus();
   console.log("Google comparison tests passed.");

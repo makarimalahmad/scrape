@@ -1,8 +1,6 @@
 const path = require('path');
 const readline = require('readline/promises');
-const { scrape, validateUrl, exportCsv } = require('./scrape');
-
-const DEFAULT_SELECTOR = '.denom, article, li, label, button, [role="radio"], [class*="product"], [class*="item"], [class*="card"], [class*="denom"]';
+const { DEFAULT_SELECTOR, scrape, validateUrl, exportCsv } = require('./scrape');
 
 function getFlagValue(name) {
   const index = process.argv.indexOf(`--${name}`);

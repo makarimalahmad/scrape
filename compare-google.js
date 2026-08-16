@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { exportCsv, scrape, validateUrl } = require("./scrape");
+const { chromium } = require("./playwright");
+const { DEFAULT_SELECTOR, exportCsv, scrape, validateUrl } = require("./scrape");
 const { validateScrapeResults } = require("./validate-results");
 const {
   GAME_CONFIGS,
@@ -12,8 +13,139 @@ const {
   selectCheapestProducts,
 } = require("./product-matcher");
 
-const DEFAULT_SELECTOR =
-  '.denom, article, li, label, button, [role="radio"], [class*="product"], [class*="item"], [class*="card"], [class*="denom"]';
+const NON_STORE_DOMAINS = [
+  "youtube.com",
+  "youtu.be",
+  "instagram.com",
+  "tiktok.com",
+  "facebook.com",
+  "fb.com",
+  "x.com",
+  "twitter.com",
+  "linkedin.com",
+  "pinterest.com",
+  "reddit.com",
+  "quora.com",
+  "discord.com",
+  "discord.gg",
+  "twitch.tv",
+  "wikipedia.org",
+  "fandom.com",
+  "play.google.com",
+  "apps.apple.com",
+  "medium.com",
+  "blogspot.com",
+  "wordpress.com",
+  "kompas.com",
+  "detik.com",
+  "tribunnews.com",
+  "cnnindonesia.com",
+  "tempo.co",
+];
+
+const GAME_RESULT_SIGNALS = {
+  "mobile-legends": ["mobile legends", "mobilelegends", "mlbb"],
+  "free-fire": ["free fire", "freefire", "free fire max"],
+  roblox: ["roblox", "robux"],
+};
+
+function classifyTopUpCompetitorResult(result, gameConfig) {
+  if (!result?.link) return { eligible: false, reason: "missing_url" };
+
+  let url;
+  try {
+    url = new URL(result.link);
+  } catch {
+    return { eligible: false, reason: "invalid_url" };
+  }
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    return { eligible: false, reason: "invalid_protocol" };
+  }
+
+  const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+  if (
+    NON_STORE_DOMAINS.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    )
+  ) {
+    return { eligible: false, reason: "non_store_domain" };
+  }
+  if (isMainStoreUrl(url.href)) {
+    return { eligible: false, reason: "main_store" };
+  }
+
+  const title = String(result.title || "").toLowerCase();
+  const pathname = decodeURIComponent(url.pathname).toLowerCase();
+  const editorialPath = /\/(?:blog|blogs|artikel|article|articles|news|berita|guide|panduan|tips?)(?:\/|$)|\/(?:cara|how-to)-/i.test(
+    pathname,
+  );
+  const editorialTitle = /^(?:\d+\s+)?(?:cara|tips?|panduan|tutorial|rekomendasi|daftar)\b|\byang perlu diketahui\b/i.test(
+    title,
+  );
+  if (editorialPath || editorialTitle) {
+    return { eligible: false, reason: "editorial_page" };
+  }
+
+  const resultText = [
+    hostname,
+    pathname,
+    title,
+    result.snippet,
+    result.displayed_link,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/[_/-]+/g, " ");
+  const gameSignals = GAME_RESULT_SIGNALS[gameConfig.id] || [
+    gameConfig.name.toLowerCase(),
+  ];
+  if (!gameSignals.some((signal) => resultText.includes(signal))) {
+    return { eligible: false, reason: "game_not_relevant" };
+  }
+
+  const hasStoreSignal = /\btop\s*up\b|\bdiamonds?\b|\bvouchers?\b|\bgift\s*cards?\b|\brobux\b|\brecharge\b|\bisi\s*ulang\b|\b(?:beli|jual|harga|termurah)\b/i.test(
+    resultText,
+  );
+  return hasStoreSignal
+    ? { eligible: true, reason: "eligible_store" }
+    : { eligible: false, reason: "transaction_not_detected" };
+}
+
+function isTopUpCompetitorResult(result, gameConfig) {
+  return classifyTopUpCompetitorResult(result, gameConfig).eligible;
+}
+
+function selectGoogleCompetitors(results, gameConfig, limit) {
+  const decisions = results.map((result, rawIndex) => {
+    const classification = classifyTopUpCompetitorResult(result, gameConfig);
+    return {
+      ...result,
+      organicPosition: result.position ?? rawIndex + 1,
+      classification: classification.reason,
+      eligible: classification.eligible,
+    };
+  });
+  const seenStores = new Set();
+  const ranking = [];
+
+  for (const result of decisions) {
+    if (!result.eligible) continue;
+    const store = normalizeHostname(result.link);
+    if (seenStores.has(store)) continue;
+    seenStores.add(store);
+    ranking.push({
+      position: result.organicPosition,
+      title: result.title,
+      link: result.link,
+      store,
+    });
+    if (ranking.length === limit) break;
+  }
+
+  return { ranking, decisions };
+}
 
 function getArgument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -35,7 +167,13 @@ function sanitizeFileName(value) {
     .replace(/^-|-$/g, "");
 }
 
-async function searchGoogle(apiKey, gameConfig, limit) {
+async function searchGoogle(
+  apiKey,
+  gameConfig,
+  limit,
+  fetchFunction = fetch,
+) {
+  const searchDepth = Math.min(100, Math.max(20, limit * 3));
   const parameters = new URLSearchParams({
     engine: "google",
     q: gameConfig.query,
@@ -43,36 +181,73 @@ async function searchGoogle(apiKey, gameConfig, limit) {
     hl: "id",
     gl: "id",
     device: "desktop",
-    num: "10",
+    num: String(searchDepth),
+    filter: "0",
     api_key: apiKey,
   });
 
-  console.log(`Cari ranking Google: ${gameConfig.query}`);
-  const response = await fetch(`https://serpapi.com/search.json?${parameters}`);
+  console.log(`Cari ranking organik Google: ${gameConfig.query}`);
+  const response = await fetchFunction(
+    `https://serpapi.com/search.json?${parameters}`,
+  );
   if (!response.ok) throw new Error(`SerpAPI HTTP ${response.status}`);
 
   const data = await response.json();
   if (data.error) throw new Error(data.error);
 
-  return (data.organic_results || [])
-    .filter((result) => result.link && !isMainStoreUrl(result.link))
-    .slice(0, limit)
-    .map((result, index) => ({
-      position: result.position ?? index + 1,
-      title: result.title,
-      link: result.link,
-      store: normalizeHostname(result.link),
-    }));
+  const organicResults = data.organic_results || [];
+  const { ranking, decisions } = selectGoogleCompetitors(
+    organicResults,
+    gameConfig,
+    limit,
+  );
+  return {
+    ranking,
+    rankingAudit: {
+      requestedCompetitorCount: limit,
+      searchDepth,
+      organicResultCount: organicResults.length,
+      eligibleCompetitorCount: ranking.length,
+      decisions: decisions.map((result) => ({
+        position: result.organicPosition,
+        title: result.title,
+        link: result.link,
+        classification: result.classification,
+      })),
+    },
+  };
 }
 
 function isTemporaryScrapeError(error) {
-  return /timeout|timed out|err_http2_protocol_error|err_timed_out|connection reset|econnreset|socket hang up|network changed|eai_again|econnrefused|navigation failed because page crashed/i.test(
+  if (error.retryable === true) return true;
+  return /timeout|timed out|tidak selesai dimuat|data harga tidak ditemukan|err_http2_protocol_error|err_timed_out|connection reset|econnreset|socket hang up|network changed|eai_again|econnrefused|navigation failed because page crashed/i.test(
     error.message,
   );
 }
 
 function getRetryDelay(attempt) {
-  return Math.min(5_000 * 2 ** (attempt - 1), 30_000);
+  return Math.min(2_000 * 2 ** (attempt - 1), 15_000);
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error("Concurrency harus bilangan bulat minimal 1.");
+  }
+
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, runWorker));
+  return results;
 }
 
 async function scrapeWithRetry(
@@ -81,18 +256,19 @@ async function scrapeWithRetry(
   maxAttempts = 3,
   scrapeFunction = scrape,
   sleepFunction = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
+  scrapeOptions = {},
 ) {
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      return await scrapeFunction(url, DEFAULT_SELECTOR, headed);
+      return await scrapeFunction(url, DEFAULT_SELECTOR, headed, scrapeOptions);
     } catch (error) {
       lastError = error;
       if (!isTemporaryScrapeError(error) || attempt === maxAttempts) throw error;
       const delay = getRetryDelay(attempt);
       console.log(
-        `Koneksi sementara gagal: ${error.message}. Coba ulang ${attempt + 1}/${maxAttempts} dalam ${delay / 1_000} detik...`,
+        `Scrape sementara belum valid: ${error.message}. Coba ulang ${attempt + 1}/${maxAttempts} dalam ${delay / 1_000} detik...`,
       );
       await sleepFunction(delay);
     }
@@ -101,23 +277,45 @@ async function scrapeWithRetry(
   throw lastError;
 }
 
-async function scrapeStore(store, gameConfig, headed, maxAttempts) {
+async function scrapeStore(store, gameConfig, options) {
   const url = validateUrl(store.url || store.link);
   console.log(`Scrape ${gameConfig.name}: ${store.name || store.store}`);
-  const rows = await scrapeWithRetry(url, headed, maxAttempts);
-  const validation = validateScrapeResults(url.href, rows);
+  let validation;
+  const rows = await scrapeWithRetry(
+    url,
+    options.headed,
+    options.maxAttempts,
+    async (...args) => {
+      const extractedRows = await scrape(...args);
+      validation = validateScrapeResults(url.href, extractedRows, gameConfig.id);
+      if (!validation.valid) {
+        const error = new Error(
+          `${validation.status}, confidence ${validation.confidence}: ${validation.reasons.join(", ")}`,
+        );
+        error.retryable =
+          validation.stats.totalRows < 2 ||
+          validation.stats.validPriceRatio < 0.8 ||
+          validation.stats.relevantProductRatio < 0.5;
+        throw error;
+      }
+      return extractedRows;
+    },
+    undefined,
+    { browser: options.browser },
+  );
 
-  if (!validation.valid) {
-    throw new Error(
-      `${validation.status}, confidence ${validation.confidence}: ${validation.reasons.join(", ")}`,
-    );
-  }
-
+  const scrapeFilePath = exportScrapeFile(
+    rows,
+    store,
+    options.scrapeOutputDirectory,
+  );
   return {
     name: store.name || store.store,
     url: url.href,
     position: store.position ?? "Utama",
     confidence: validation.confidence,
+    rawProductCount: rows.length,
+    scrapeFilePath,
     products: selectCheapestProducts(rows, gameConfig.id),
   };
 }
@@ -167,34 +365,31 @@ function createPairRows(gameConfig, mainStore, competitor) {
       continue;
     }
 
-    for (const match of matches) {
-      const competitorProduct = match.product;
-      const difference = mainProduct.price - competitorProduct.price;
-      matchedCompetitorKeys.add(competitorProduct.mapKey);
+    const match = matches[0];
+    const competitorProduct = match.product;
+    const difference = mainProduct.price - competitorProduct.price;
+    matchedCompetitorKeys.add(competitorProduct.mapKey);
 
-      rows.push({
-        Game: gameConfig.name,
-        "Situs Utama": mainStore.name,
-        "Produk Utama": mainProduct.rawName,
-        "Jumlah Utama": mainProduct.quantity ?? "-",
-        "Harga Utama": formatPrice(mainProduct.price),
-        "Harga/Unit Utama": formatPrice(mainProduct.pricePerUnit),
-        "Ranking Google Pembanding": competitor.position,
-        "Situs Pembanding": competitor.name,
-        "Produk Pembanding": competitorProduct.rawName,
-        "Jumlah Pembanding": competitorProduct.quantity ?? "-",
-        "Harga Pembanding": formatPrice(competitorProduct.price),
-        "Harga/Unit Pembanding": formatPrice(
-          competitorProduct.pricePerUnit,
-        ),
-        "Selisih Jumlah": match.quantityDifference,
-        "Selisih Harga": formatPrice(Math.abs(difference)),
-        Status: describeStatus(mainProduct, competitorProduct, difference),
-        "URL Utama": mainStore.url,
-        "URL Pembanding": competitor.url,
-        _difference: difference,
-      });
-    }
+    rows.push({
+      Game: gameConfig.name,
+      "Situs Utama": mainStore.name,
+      "Produk Utama": mainProduct.rawName,
+      "Jumlah Utama": mainProduct.quantity ?? "-",
+      "Harga Utama": formatPrice(mainProduct.price),
+      "Harga/Unit Utama": formatPrice(mainProduct.pricePerUnit),
+      "Ranking Google Pembanding": competitor.position,
+      "Situs Pembanding": competitor.name,
+      "Produk Pembanding": competitorProduct.rawName,
+      "Jumlah Pembanding": competitorProduct.quantity ?? "-",
+      "Harga Pembanding": formatPrice(competitorProduct.price),
+      "Harga/Unit Pembanding": formatPrice(competitorProduct.pricePerUnit),
+      "Selisih Jumlah": match.quantityDifference,
+      "Selisih Harga": formatPrice(Math.abs(difference)),
+      Status: describeStatus(mainProduct, competitorProduct, difference),
+      "URL Utama": mainStore.url,
+      "URL Pembanding": competitor.url,
+      _difference: difference,
+    });
   }
 
   for (const competitorProduct of competitor.products.values()) {
@@ -235,6 +430,19 @@ function createPairFileName(mainStore, competitor) {
   return `rank-${rank}-${mainName}-vs-${competitorName}`;
 }
 
+function createScrapeFileName(store) {
+  const name = sanitizeFileName(store.name || store.store);
+  if (store.position === undefined || store.position === "Utama") {
+    return `main-${name}`;
+  }
+  return `rank-${String(store.position).padStart(2, "0")}-${name}`;
+}
+
+function exportScrapeFile(rows, store, outputDirectory) {
+  fs.mkdirSync(outputDirectory, { recursive: true });
+  return exportCsv(rows, path.join(outputDirectory, createScrapeFileName(store)));
+}
+
 function exportComparisonFiles(
   gameConfig,
   mainStores,
@@ -259,11 +467,24 @@ function exportComparisonFiles(
         createPairFileName(mainStore, competitor),
       );
       const csvPath = exportCsv(rows, outputName);
+      const matchedPairCount = rows.filter(
+        (row) =>
+          row["Produk Utama"] !== "-" && row["Produk Pembanding"] !== "-",
+      ).length;
+      const unmatchedMainCount = rows.filter(
+        (row) => row["Produk Utama"] !== "-" && row["Produk Pembanding"] === "-",
+      ).length;
+      const unmatchedCompetitorCount = rows.filter(
+        (row) => row["Produk Utama"] === "-" && row["Produk Pembanding"] !== "-",
+      ).length;
       files.push({
         mainStore: mainStore.name,
         competitor: competitor.name,
         ranking: competitor.position,
-        comparisonCount: rows.length,
+        outputRowCount: rows.length,
+        matchedPairCount,
+        unmatchedMainCount,
+        unmatchedCompetitorCount,
         csvPath,
       });
     }
@@ -274,109 +495,250 @@ function exportComparisonFiles(
 
 async function processGame(apiKey, gameConfig, options) {
   console.log(`\n===== ${gameConfig.name} =====`);
-  const ranking = await searchGoogle(apiKey, gameConfig, options.limit);
+  const { ranking, rankingAudit } = await searchGoogle(
+    apiKey,
+    gameConfig,
+    options.limit,
+  );
   console.table(ranking);
 
   const mainStores = [];
-  for (const mainStore of gameConfig.mainStores) {
-    try {
-      mainStores.push(
-        await scrapeStore(
-          mainStore,
-          gameConfig,
-          options.headed,
-          options.maxAttempts,
-        ),
-      );
-    } catch (error) {
-      console.error(`Gagal situs utama ${mainStore.name}: ${error.message}`);
-    }
-  }
-
-  if (!mainStores.length) {
-    throw new Error(`Semua situs utama ${gameConfig.name} gagal.`);
-  }
-
+  const failedMainStores = [];
   const competitors = [];
   const failedCompetitors = [];
-  for (const rankedStore of ranking) {
-    try {
-      competitors.push(
-        await scrapeStore(
-          rankedStore,
-          gameConfig,
-          options.headed,
-          options.maxAttempts,
-        ),
-      );
-    } catch (error) {
-      failedCompetitors.push({
-        position: rankedStore.position,
-        store: rankedStore.store,
-        url: rankedStore.link,
-        error: error.message,
-      });
-      console.error(`Lewati ${rankedStore.store}: ${error.message}`);
-    }
-  }
+  const scrapes = [];
 
-  if (!competitors.length) {
-    throw new Error(`Semua situs pembanding ${gameConfig.name} gagal.`);
-  }
-
-  const files = exportComparisonFiles(
-    gameConfig,
-    mainStores,
-    competitors,
-    options.outputDirectory,
+  const mainResults = await mapWithConcurrency(
+    gameConfig.mainStores,
+    Math.min(2, options.concurrency),
+    async (mainStore) => {
+      try {
+        return {
+          success: true,
+          store: await scrapeStore(mainStore, gameConfig, options),
+        };
+      } catch (error) {
+        return { success: false, source: mainStore, error };
+      }
+    },
   );
-  if (!files.length) {
-    throw new Error(`Tidak ada produk ${gameConfig.name} yang cocok.`);
+
+  for (const result of mainResults) {
+    if (result.success) {
+      const store = result.store;
+      mainStores.push(store);
+      scrapes.push({
+        type: "main",
+        name: store.name,
+        url: store.url,
+        success: true,
+        productCount: store.products.size,
+        rawProductCount: store.rawProductCount,
+        confidence: store.confidence,
+        scrapeFilePath: store.scrapeFilePath,
+      });
+      continue;
+    }
+
+    const failure = {
+      name: result.source.name,
+      url: result.source.url,
+      success: false,
+      error: result.error.message,
+    };
+    failedMainStores.push(failure);
+    scrapes.push({ type: "main", ...failure });
+    console.error(`Gagal situs utama ${failure.name}: ${failure.error}`);
   }
 
+  const competitorResults = await mapWithConcurrency(
+    ranking,
+    options.concurrency,
+    async (rankedStore) => {
+      try {
+        return {
+          success: true,
+          store: await scrapeStore(rankedStore, gameConfig, options),
+        };
+      } catch (error) {
+        return { success: false, source: rankedStore, error };
+      }
+    },
+  );
+
+  for (const result of competitorResults) {
+    if (result.success) {
+      const store = result.store;
+      competitors.push(store);
+      scrapes.push({
+        type: "competitor",
+        position: store.position,
+        name: store.name,
+        url: store.url,
+        success: true,
+        productCount: store.products.size,
+        rawProductCount: store.rawProductCount,
+        confidence: store.confidence,
+        scrapeFilePath: store.scrapeFilePath,
+      });
+      continue;
+    }
+
+    const failure = {
+      position: result.source.position,
+      name: result.source.store,
+      url: result.source.link,
+      success: false,
+      error: result.error.message,
+    };
+    failedCompetitors.push(failure);
+    scrapes.push({ type: "competitor", ...failure });
+    console.error(`Lewati ${failure.name}: ${failure.error}`);
+  }
+
+  let error = null;
+  let files = [];
+  if (!mainStores.length) {
+    error = `Semua situs utama ${gameConfig.name} gagal.`;
+  } else if (!competitors.length) {
+    error = `Semua situs pembanding ${gameConfig.name} gagal.`;
+  } else {
+    files = exportComparisonFiles(
+      gameConfig,
+      mainStores,
+      competitors,
+      options.outputDirectory,
+    );
+    if (!files.length) error = `Tidak ada produk ${gameConfig.name} yang cocok.`;
+  }
+
+  const successfulScrapeCount = scrapes.filter((scrapeResult) =>
+    scrapeResult.success).length;
+  const allScrapesSuccessful =
+    scrapes.length > 0 && successfulScrapeCount === scrapes.length;
+  const rankingComplete = ranking.length >= options.limit;
+  const usable = error === null;
+  const status = !usable
+    ? "FAILED"
+    : allScrapesSuccessful && rankingComplete
+      ? "COMPLETE"
+      : "PARTIAL";
   return {
+    status,
+    success: status === "COMPLETE",
+    usable,
+    rankingComplete,
+    allScrapesSuccessful,
     game: gameConfig.name,
+    gameId: gameConfig.id,
     query: gameConfig.query,
     ranking,
+    rankingAudit,
+    scrapeCount: scrapes.length,
+    successfulScrapeCount,
+    failedScrapeCount: scrapes.length - successfulScrapeCount,
+    scrapes,
     mainStores: mainStores.map((store) => ({
       name: store.name,
       url: store.url,
+      success: true,
       productCount: store.products.size,
+      rawProductCount: store.rawProductCount,
       confidence: store.confidence,
+      scrapeFilePath: store.scrapeFilePath,
     })),
+    failedMainStores,
     competitors: competitors.map((store) => ({
       name: store.name,
       url: store.url,
       position: store.position,
+      success: true,
       productCount: store.products.size,
+      rawProductCount: store.rawProductCount,
       confidence: store.confidence,
+      scrapeFilePath: store.scrapeFilePath,
     })),
     failedCompetitors,
+    scrapeFileCount: successfulScrapeCount,
+    scrapeOutputDirectory: options.scrapeOutputDirectory,
     comparisonFileCount: files.length,
+    outputRowCount: files.reduce(
+      (total, file) => total + file.outputRowCount,
+      0,
+    ),
     comparisonCount: files.reduce(
-      (total, file) => total + file.comparisonCount,
+      (total, file) => total + file.matchedPairCount,
+      0,
+    ),
+    unmatchedMainCount: files.reduce(
+      (total, file) => total + file.unmatchedMainCount,
+      0,
+    ),
+    unmatchedCompetitorCount: files.reduce(
+      (total, file) => total + file.unmatchedCompetitorCount,
       0,
     ),
     files,
+    ...(error ? { error } : {}),
   };
 }
 
 function createOverallSummary(summaries, generatedAt) {
-  const successfulGameCount = summaries.filter((summary) => summary.success).length;
+  const completeGameCount = summaries.filter(
+    (summary) => summary.status === "COMPLETE" || summary.success,
+  ).length;
+  const usableGameCount = summaries.filter(
+    (summary) => summary.usable ?? summary.success,
+  ).length;
+  const partialGameCount = summaries.filter(
+    (summary) => summary.status === "PARTIAL",
+  ).length;
+  const scrapes = summaries.flatMap((summary) =>
+    (summary.scrapes || []).map((scrapeResult) => ({
+      game: summary.game,
+      ...scrapeResult,
+    })));
+  const successfulScrapeCount = scrapes.filter((scrapeResult) =>
+    scrapeResult.success).length;
+  const allScrapesSuccessful =
+    scrapes.length > 0 && successfulScrapeCount === scrapes.length;
+  const status = completeGameCount === summaries.length && summaries.length > 0
+    ? "COMPLETE"
+    : usableGameCount > 0
+      ? "PARTIAL"
+      : "FAILED";
   return {
-    success: successfulGameCount === summaries.length,
+    status,
+    success: status === "COMPLETE",
+    usable: usableGameCount > 0,
+    allScrapesSuccessful,
     generatedAt,
     gameCount: summaries.length,
-    successfulGameCount,
-    failedGameCount: summaries.length - successfulGameCount,
+    successfulGameCount: completeGameCount,
+    completeGameCount,
+    partialGameCount,
+    usableGameCount,
+    failedGameCount: summaries.length - usableGameCount,
+    scrapeCount: scrapes.length,
+    successfulScrapeCount,
+    failedScrapeCount: scrapes.length - successfulScrapeCount,
+    scrapeFileCount: summaries.reduce(
+      (total, summary) => total + (summary.scrapeFileCount || 0),
+      0,
+    ),
     comparisonFileCount: summaries.reduce(
       (total, summary) => total + (summary.comparisonFileCount || 0),
+      0,
+    ),
+    outputRowCount: summaries.reduce(
+      (total, summary) => total + (summary.outputRowCount || 0),
       0,
     ),
     comparisonCount: summaries.reduce(
       (total, summary) => total + (summary.comparisonCount || 0),
       0,
     ),
+    scrapes,
     games: summaries,
   };
 }
@@ -409,50 +771,88 @@ async function main() {
   const maxAttempts = Number.isInteger(attemptsValue)
     ? Math.min(5, Math.max(1, attemptsValue))
     : 3;
+  const concurrencyValue = Number(getArgument("concurrency", headed ? "1" : "3"));
+  const concurrency = headed
+    ? 1
+    : Number.isInteger(concurrencyValue)
+      ? Math.min(4, Math.max(1, concurrencyValue))
+      : 3;
   const generatedAt = new Date().toISOString();
   const timestamp = generatedAt.replace(/[:.]/g, "-");
   const date = timestamp.slice(0, 10);
-  const comparisonDirectory = path.resolve(
-    __dirname,
-    "output",
-    date,
-    "comparison",
-  );
-  const runDirectory = path.join(comparisonDirectory, gameId, timestamp);
-  fs.mkdirSync(runDirectory, { recursive: true });
+  const runOutputDirectory = path.resolve(__dirname, "output", date);
+  const comparisonDirectory = path.join(runOutputDirectory, "comparison");
+  const scrapeDirectory = path.join(runOutputDirectory, "scrapes");
+  fs.mkdirSync(comparisonDirectory, { recursive: true });
+  fs.mkdirSync(scrapeDirectory, { recursive: true });
 
   const summaries = [];
-  for (const gameConfig of selectedGames) {
-    const outputDirectory = gameId === "all"
-      ? path.join(runDirectory, gameConfig.id)
-      : runDirectory;
-    fs.mkdirSync(outputDirectory, { recursive: true });
-    try {
-      const summary = await processGame(apiKey, gameConfig, {
-        limit,
-        headed,
-        maxAttempts,
-        timestamp,
-        outputDirectory,
-      });
-      summaries.push({ success: true, ...summary });
-    } catch (error) {
-      summaries.push({
-        success: false,
-        game: gameConfig.name,
-        query: gameConfig.query,
-        comparisonFileCount: 0,
-        comparisonCount: 0,
-        error: error.message,
-      });
-      console.error(`Gagal ${gameConfig.name}: ${error.message}`);
+  const browser = await chromium.launch({ headless: !headed });
+  try {
+    for (const gameConfig of selectedGames) {
+      const outputDirectory = path.join(comparisonDirectory, gameConfig.id);
+      const scrapeOutputDirectory = path.join(scrapeDirectory, gameConfig.id);
+      fs.mkdirSync(outputDirectory, { recursive: true });
+      fs.mkdirSync(scrapeOutputDirectory, { recursive: true });
+      let summary;
+      try {
+        summary = await processGame(apiKey, gameConfig, {
+          browser,
+          concurrency,
+          limit,
+          headed,
+          maxAttempts,
+          timestamp,
+          outputDirectory,
+          scrapeOutputDirectory,
+        });
+      } catch (error) {
+        summary = {
+          status: "FAILED",
+          success: false,
+          usable: false,
+          rankingComplete: false,
+          allScrapesSuccessful: false,
+          game: gameConfig.name,
+          gameId: gameConfig.id,
+          query: gameConfig.query,
+          ranking: [],
+          rankingAudit: null,
+          scrapeCount: 0,
+          successfulScrapeCount: 0,
+          failedScrapeCount: 0,
+          scrapes: [],
+          mainStores: [],
+          failedMainStores: [],
+          competitors: [],
+          failedCompetitors: [],
+          scrapeFileCount: 0,
+          scrapeOutputDirectory,
+          comparisonFileCount: 0,
+          outputRowCount: 0,
+          comparisonCount: 0,
+          unmatchedMainCount: 0,
+          unmatchedCompetitorCount: 0,
+          files: [],
+          error: error.message,
+        };
+        console.error(`Gagal ${gameConfig.name}: ${error.message}`);
+      }
+      summaries.push(summary);
+      const gameSummaryPath = path.join(
+        comparisonDirectory,
+        `summary-${gameConfig.id}-${timestamp}.json`,
+      );
+      fs.writeFileSync(gameSummaryPath, JSON.stringify(summary, null, 2), "utf8");
     }
+  } finally {
+    await browser.close();
   }
 
   const overallSummary = createOverallSummary(summaries, generatedAt);
   const summaryPath = path.join(
-    runDirectory,
-    `summary-${gameId}-${timestamp}.json`,
+    comparisonDirectory,
+    `summary-all-${timestamp}.json`,
   );
   fs.writeFileSync(
     summaryPath,
@@ -471,6 +871,8 @@ async function main() {
       error: summary.error || "-",
     })),
   );
+  console.log(`Hasil scrape: ${scrapeDirectory}`);
+  console.log(`Hasil perbandingan: ${comparisonDirectory}`);
   console.log(`Summary: ${summaryPath}`);
 
   if (!overallSummary.success) process.exitCode = 1;
@@ -484,13 +886,19 @@ if (require.main === module) {
 }
 
 module.exports = {
+  classifyTopUpCompetitorResult,
   createOverallSummary,
   createPairFileName,
+  createScrapeFileName,
   createPairRows,
   describeStatus,
   exportComparisonFiles,
+  exportScrapeFile,
   getRetryDelay,
   isTemporaryScrapeError,
+  isTopUpCompetitorResult,
+  mapWithConcurrency,
   scrapeWithRetry,
   searchGoogle,
+  selectGoogleCompetitors,
 };

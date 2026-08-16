@@ -1,5 +1,40 @@
 const assert = require("assert");
+const {
+  normalizeMobapayProductName,
+  parseDuniaGamesCardText,
+  parseUniPinCardText,
+  parseUPointCardText,
+} = require("./scrape");
 const { validateScrapeResults } = require("./validate-results");
+
+function testKnownSiteCardParsers() {
+  assert.deepStrictEqual(parseUPointCardText("5 Diamonds\nFrom\n1.579"), {
+    Produk: "5 Diamonds",
+    Harga: "Rp 1.579",
+  });
+  assert.deepStrictEqual(
+    parseDuniaGamesCardText("3 Diamonds\n1.195", "3 Diamonds"),
+    { Produk: "3 Diamonds", Harga: "Rp 1.195" },
+  );
+  assert.deepStrictEqual(
+    parseUniPinCardText("5 Diamonds + 0 Bonus\nIDR 1.425"),
+    { Produk: "5 Diamonds + 0 Bonus", Harga: "IDR 1.425" },
+  );
+  assert.strictEqual(parseUPointCardText("Pilih denom terlebih dahulu Rp 0"), null);
+  assert.strictEqual(parseUniPinCardText("Total IDR 0"), null);
+  assert.strictEqual(
+    normalizeMobapayProductName("11 +1", "/mlbb"),
+    "11 +1 Diamonds",
+  );
+  assert.strictEqual(
+    normalizeMobapayProductName("Weekly Diamond Pass", "/mlbb"),
+    "Weekly Diamond Pass",
+  );
+  assert.strictEqual(
+    normalizeMobapayProductName("60 UC", "/pubg"),
+    "60 UC",
+  );
+}
 
 function testInvalidUnknownSite() {
   const rows = [{ Produk: "abungan", Harga: "$0.17" }];
@@ -40,6 +75,57 @@ function testBrokenKnownSite() {
   assert.strictEqual(result.status, "DATA_TIDAK_VALID");
 }
 
+function testNumericNoiseRejected() {
+  const rows = [
+    { Produk: "1", Harga: "1000" },
+    { Produk: "2", Harga: "2000" },
+    { Produk: "3", Harga: "3000" },
+    { Produk: "4", Harga: "4000" },
+  ];
+  const result = validateScrapeResults(
+    "https://unknown-store.example/mobile-legends",
+    rows,
+    "mobile-legends",
+  );
+
+  assert.strictEqual(result.valid, false);
+}
+
+function testMobapayMobileLegendsRows() {
+  const rows = [
+    { Produk: "50 +50 Diamonds", Harga: "Rp. 14.053" },
+    { Produk: "150 +150 Diamonds", Harga: "Rp. 41.919" },
+    { Produk: "Weekly Diamond Pass", Harga: "Rp. 27.000" },
+    { Produk: "Weekly Elite Bundle", Harga: "Rp. 14.053" },
+    { Produk: "5 Diamonds", Harga: "Rp. 1.410" },
+    { Produk: "11 +1 Diamonds", Harga: "Rp. 3.290" },
+  ];
+  const result = validateScrapeResults(
+    "https://www.mobapay.com/mlbb",
+    rows,
+    "mobile-legends",
+  );
+
+  assert.strictEqual(result.valid, true);
+  assert.strictEqual(result.stats.relevantProductRatio, 1);
+}
+
+function testWrongGameProductsRejected() {
+  const rows = [
+    { Produk: "5 Diamonds", Harga: "Rp 1.500" },
+    { Produk: "12 Diamonds", Harga: "Rp 3.500" },
+    { Produk: "50 Diamonds", Harga: "Rp 14.000" },
+    { Produk: "Weekly Diamond Pass", Harga: "Rp 28.000" },
+  ];
+  const result = validateScrapeResults(
+    "https://new-store.example/roblox",
+    rows,
+    "roblox",
+  );
+
+  assert.strictEqual(result.valid, false);
+}
+
 function testValidUnknownSite() {
   const rows = [
     { Produk: "5 Diamonds", Harga: "Rp 1.500" },
@@ -56,8 +142,12 @@ function testValidUnknownSite() {
   assert.strictEqual(result.status, "VALID");
 }
 
+testKnownSiteCardParsers();
 testInvalidUnknownSite();
 testValidKnownSite();
 testBrokenKnownSite();
+testNumericNoiseRejected();
+testMobapayMobileLegendsRows();
+testWrongGameProductsRejected();
 testValidUnknownSite();
 console.log("Validation tests passed.");
