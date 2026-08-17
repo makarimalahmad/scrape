@@ -37,6 +37,32 @@ function validateUrl(value) {
   return url;
 }
 
+function normalizeTokopediaUrl(value, gameId = null) {
+  const url = value instanceof URL ? new URL(value.href) : validateUrl(value);
+  const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname !== "tokopedia.com") return url;
+
+  const gameSlugs = {
+    "mobile-legends": "mobile-legends-bang-bang",
+    "free-fire": "free-fire",
+    roblox: "roblox",
+  };
+  let slug = gameSlugs[gameId];
+  if (!slug) {
+    const pathText = decodeURIComponent(url.pathname).toLowerCase();
+    if (/mobile[-_ ]?legends|\bmlbb\b/.test(pathText)) {
+      slug = gameSlugs["mobile-legends"];
+    } else if (/free[-_ ]?fire/.test(pathText)) {
+      slug = gameSlugs["free-fire"];
+    } else if (/roblox|robux/.test(pathText)) {
+      slug = gameSlugs.roblox;
+    }
+  }
+  if (!slug) return url;
+
+  return new URL(`https://www.tokopedia.com/digital/voucher-game/${slug}`);
+}
+
 function createOutputName(url) {
   const domain = url.hostname
     .replace(/^www\./, "")
@@ -142,6 +168,116 @@ async function extractUniPinRows(page) {
       })
       .filter(Boolean),
   );
+}
+
+function parseBlibliOptionText(text) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  const price = cleanText.match(/Rp\s*\d[\d.]*/i);
+  if (!price || Number(price[0].replace(/\D/g, "")) <= 0) return null;
+  const product = cleanText.slice(0, price.index).trim();
+  if (!product) return null;
+  return { Produk: product, Harga: price[0] };
+}
+
+async function extractBlibliRows(page) {
+  const productDropdown = page.locator("#nominalField .blu-dropdown-field");
+  const ready = await page
+    .waitForFunction(
+      () => {
+        const input = document.querySelector("#nominalField input");
+        return Boolean(input?.value?.trim());
+      },
+      null,
+      { timeout: 30_000, polling: 250 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!ready) return [];
+
+  const options = page.locator("#nominalField .field__dropdown-list");
+  for (let attempt = 0; attempt < 3 && !(await options.count()); attempt += 1) {
+    await productDropdown.click({ force: true, timeout: 2_000 }).catch(() => {});
+    await options
+      .first()
+      .waitFor({ state: "attached", timeout: 2_000 })
+      .catch(() => {});
+  }
+
+  return options.evaluateAll((elements) =>
+    elements
+      .map((element) => {
+        const product = element
+          .querySelector(".field__dropdown-list-text")
+          ?.textContent?.replace(/\s+/g, " ")
+          .trim();
+        const price = element
+          .querySelector(".field__dropdown-list-img")
+          ?.textContent?.replace(/\s+/g, " ")
+          .trim();
+        return product && price ? { Produk: product, Harga: price } : null;
+      })
+      .filter(Boolean),
+  );
+}
+
+async function extractTokopediaRows(page) {
+  const rows = [];
+  const seen = new Set();
+  const consentButton = page.getByText("Saya mengerti", { exact: true });
+  if (await consentButton.count()) {
+    await consentButton.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(250);
+  }
+
+  const tabs = page.locator('[role="tab"]');
+  const tabCount = await tabs.count();
+
+  for (let index = 0; index < tabCount; index += 1) {
+    const tab = tabs.nth(index);
+    let active = (await tab.getAttribute("data-state")) === "active";
+
+    for (let attempt = 0; !active && attempt < 3; attempt += 1) {
+      await tab.click({ force: true, timeout: 2_000 }).catch(() => {});
+      active = await page
+        .waitForFunction(
+          ([tabIndex]) =>
+            document.querySelectorAll('[role="tab"]')[tabIndex]?.getAttribute(
+              "data-state",
+            ) === "active",
+          [index],
+          { timeout: 1_500, polling: 100 },
+        )
+        .then(() => true)
+        .catch(() => false);
+    }
+
+    if (!active) continue;
+    await page.waitForTimeout(300);
+
+    const tabRows = await page
+      .locator('[role="tabpanel"][data-state="active"] > div')
+      .evaluateAll((cards) =>
+        cards
+          .map((card) => {
+            const product = card.querySelector("h3")?.textContent
+              ?.replace(/\s+/g, " ")
+              .trim();
+            const text = card.textContent?.replace(/\s+/g, " ").trim() || "";
+            const price = text.match(/Rp\s*\d[\d.]*/i)?.[0];
+            return product && price ? { Produk: product, Harga: price } : null;
+          })
+          .filter(Boolean),
+      );
+
+    for (const row of tabRows) {
+      const key = `${row.Produk.toLowerCase()}|${row.Harga.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
+  }
+
+  return rows;
 }
 
 async function extractGopayRows(page) {
@@ -304,6 +440,8 @@ async function extractSpecialRows(page, url) {
   if (hostname === "unipin.com" && !/roblox/i.test(url.pathname)) {
     return extractUniPinRows(page);
   }
+  if (hostname === "tokopedia.com") return extractTokopediaRows(page);
+  if (hostname === "blibli.com") return extractBlibliRows(page);
   if (hostname === "roblox.com") return extractRobloxRows(page);
   if (hostname === "kiosgamer.co.id") return extractKiosgamerRows(page);
   if (hostname === "gopay.co.id") return extractGopayRows(page);
@@ -905,7 +1043,7 @@ function saveInvalidReport(output, url, validation, rows) {
 }
 
 async function main() {
-  const url = validateUrl(await getUrl());
+  const url = normalizeTokopediaUrl(await getUrl());
   const selector = getArgument("selector", DEFAULT_SELECTOR);
   const output = getArgument("output", createOutputName(url));
   const headed = process.argv.includes("--headed");
@@ -940,6 +1078,8 @@ module.exports = {
   DEFAULT_SELECTOR,
   exportCsv,
   normalizeMobapayProductName,
+  normalizeTokopediaUrl,
+  parseBlibliOptionText,
   parseDuniaGamesCardText,
   parseUniPinCardText,
   parseUPointCardText,

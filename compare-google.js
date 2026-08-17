@@ -1,7 +1,12 @@
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("./playwright");
-const { DEFAULT_SELECTOR, exportCsv, scrape, validateUrl } = require("./scrape");
+const {
+  DEFAULT_SELECTOR,
+  exportCsv,
+  normalizeTokopediaUrl,
+  scrape,
+} = require("./scrape");
 const { validateScrapeResults } = require("./validate-results");
 const {
   GAME_CONFIGS,
@@ -277,8 +282,12 @@ async function scrapeWithRetry(
   throw lastError;
 }
 
+function normalizeStoreUrl(value, gameConfig) {
+  return normalizeTokopediaUrl(value, gameConfig.id);
+}
+
 async function scrapeStore(store, gameConfig, options) {
-  const url = validateUrl(store.url || store.link);
+  const url = normalizeStoreUrl(store.url || store.link, gameConfig);
   console.log(`Scrape ${gameConfig.name}: ${store.name || store.store}`);
   let validation;
   const rows = await scrapeWithRetry(
@@ -436,6 +445,23 @@ function createScrapeFileName(store) {
     return `main-${name}`;
   }
   return `rank-${String(store.position).padStart(2, "0")}-${name}`;
+}
+
+function createUniqueRunDirectory(outputRoot, date) {
+  fs.mkdirSync(outputRoot, { recursive: true });
+
+  for (let sequence = 1; sequence <= 10_000; sequence += 1) {
+    const folderName = sequence === 1 ? date : `${date}(${sequence})`;
+    const directory = path.join(outputRoot, folderName);
+    try {
+      fs.mkdirSync(directory);
+      return directory;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+  }
+
+  throw new Error(`Tidak dapat membuat folder output unik untuk ${date}.`);
 }
 
 function exportScrapeFile(rows, store, outputDirectory) {
@@ -780,11 +806,14 @@ async function main() {
   const generatedAt = new Date().toISOString();
   const timestamp = generatedAt.replace(/[:.]/g, "-");
   const date = timestamp.slice(0, 10);
-  const runOutputDirectory = path.resolve(__dirname, "output", date);
+  const runOutputDirectory = createUniqueRunDirectory(
+    path.resolve(__dirname, "output"),
+    date,
+  );
   const comparisonDirectory = path.join(runOutputDirectory, "comparison");
   const scrapeDirectory = path.join(runOutputDirectory, "scrapes");
-  fs.mkdirSync(comparisonDirectory, { recursive: true });
-  fs.mkdirSync(scrapeDirectory, { recursive: true });
+  fs.mkdirSync(comparisonDirectory);
+  fs.mkdirSync(scrapeDirectory);
 
   const summaries = [];
   const browser = await chromium.launch({ headless: !headed });
@@ -890,6 +919,7 @@ module.exports = {
   createOverallSummary,
   createPairFileName,
   createScrapeFileName,
+  createUniqueRunDirectory,
   createPairRows,
   describeStatus,
   exportComparisonFiles,
@@ -898,6 +928,7 @@ module.exports = {
   isTemporaryScrapeError,
   isTopUpCompetitorResult,
   mapWithConcurrency,
+  normalizeStoreUrl,
   scrapeWithRetry,
   searchGoogle,
   selectGoogleCompetitors,

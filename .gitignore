@@ -11,6 +11,7 @@ test-results/
 .env.*
 !.env.example
 *.csv
+*.invalid.json
 Mobile Legends/
 Free Fire/
 Roblox/

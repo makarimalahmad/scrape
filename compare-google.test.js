@@ -1,4 +1,7 @@
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const {
   findMatches,
   parseProduct,
@@ -8,12 +11,14 @@ const {
   createOverallSummary,
   createPairFileName,
   createScrapeFileName,
+  createUniqueRunDirectory,
   createPairRows,
   describeStatus,
   getRetryDelay,
   isTemporaryScrapeError,
   isTopUpCompetitorResult,
   mapWithConcurrency,
+  normalizeStoreUrl,
   scrapeWithRetry,
   searchGoogle,
   selectGoogleCompetitors,
@@ -169,6 +174,56 @@ async function testGoogleRankingSelection() {
     result.rankingAudit.decisions[0].classification,
     "editorial_page",
   );
+}
+
+function testStoreUrlNormalization() {
+  const mobileLegends = GAME_CONFIGS.find(
+    (game) => game.id === "mobile-legends",
+  );
+  const freeFire = GAME_CONFIGS.find((game) => game.id === "free-fire");
+  const roblox = GAME_CONFIGS.find((game) => game.id === "roblox");
+
+  assert.strictEqual(
+    normalizeStoreUrl(
+      "https://www.tokopedia.com/voucher-game/mobile-legends/",
+      mobileLegends,
+    ).href,
+    "https://www.tokopedia.com/digital/voucher-game/mobile-legends-bang-bang",
+  );
+  assert.strictEqual(
+    normalizeStoreUrl(
+      "https://www.tokopedia.com/voucher-game/free-fire/",
+      freeFire,
+    ).href,
+    "https://www.tokopedia.com/digital/voucher-game/free-fire",
+  );
+  assert.strictEqual(
+    normalizeStoreUrl("https://tokopedia.com/voucher-game/roblox", roblox).href,
+    "https://www.tokopedia.com/digital/voucher-game/roblox",
+  );
+  assert.strictEqual(
+    normalizeStoreUrl("https://www.unipin.com/id/mobile-legends", mobileLegends)
+      .href,
+    "https://www.unipin.com/id/mobile-legends",
+  );
+}
+
+function testUniqueRunDirectories() {
+  const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "scrape-output-"));
+  try {
+    const first = createUniqueRunDirectory(outputRoot, "2026-08-17");
+    const second = createUniqueRunDirectory(outputRoot, "2026-08-17");
+    const third = createUniqueRunDirectory(outputRoot, "2026-08-17");
+
+    assert.strictEqual(path.basename(first), "2026-08-17");
+    assert.strictEqual(path.basename(second), "2026-08-17(2)");
+    assert.strictEqual(path.basename(third), "2026-08-17(3)");
+    assert(fs.statSync(first).isDirectory());
+    assert(fs.statSync(second).isDirectory());
+    assert(fs.statSync(third).isDirectory());
+  } finally {
+    fs.rmSync(outputRoot, { recursive: true, force: true });
+  }
 }
 
 function testProductParsing() {
@@ -424,6 +479,8 @@ async function main() {
   testMainStoresExcludedFromRanking();
   testTopUpCompetitorFiltering();
   await testGoogleRankingSelection();
+  testStoreUrlNormalization();
+  testUniqueRunDirectories();
   testProductParsing();
   testProximityMatching();
   testPairRowsAndFileName();

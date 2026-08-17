@@ -1,6 +1,8 @@
 const assert = require("assert");
 const {
   normalizeMobapayProductName,
+  normalizeTokopediaUrl,
+  parseBlibliOptionText,
   parseDuniaGamesCardText,
   parseUniPinCardText,
   parseUPointCardText,
@@ -34,6 +36,26 @@ function testKnownSiteCardParsers() {
     normalizeMobapayProductName("60 UC", "/pubg"),
     "60 UC",
   );
+  assert.strictEqual(
+    normalizeTokopediaUrl(
+      "https://www.tokopedia.com/voucher-game/free-fire/",
+    ).href,
+    "https://www.tokopedia.com/digital/voucher-game/free-fire",
+  );
+  assert.strictEqual(
+    normalizeTokopediaUrl(
+      "https://www.tokopedia.com/voucher-game/mobile-legends/",
+    ).href,
+    "https://www.tokopedia.com/digital/voucher-game/mobile-legends-bang-bang",
+  );
+  assert.deepStrictEqual(
+    parseBlibliOptionText("310 Diamonds + Bonus 35 Diamonds\nRp54.390"),
+    {
+      Produk: "310 Diamonds + Bonus 35 Diamonds",
+      Harga: "Rp54.390",
+    },
+  );
+  assert.strictEqual(parseBlibliOptionText("Produk belum dipilih"), null);
 }
 
 function testInvalidUnknownSite() {
