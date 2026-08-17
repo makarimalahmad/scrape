@@ -353,8 +353,8 @@ function testAllProductsIncluded() {
 
   assert.strictEqual(rows.length, 4);
   assert(rows.some((row) => row["Produk Utama"] === "50.000 IDR - Gift Card"));
-  assert(rows.some((row) => row.Status === "Tidak ada pasangan di situs pembanding"));
-  assert(rows.some((row) => row.Status === "Produk hanya ada di situs pembanding"));
+  assert(rows.some((row) => row.Status === "TIDAK_ADA_DI_PEMBANDING"));
+  assert(rows.some((row) => row.Status === "HANYA_ADA_DI_PEMBANDING"));
 }
 
 function testTemporaryScrapeErrors() {
@@ -466,12 +466,9 @@ function testOverallSummary() {
 }
 
 function testComparisonStatus() {
-  const status = describeStatus(
-    { quantity: 34, price: 12910 },
-    { quantity: 36, price: 10367 },
-    2543,
-  );
-  assert.strictEqual(status, "Pembanding lebih banyak/sama dan lebih murah");
+  assert.strictEqual(describeStatus(2543), "PEMBANDING_LEBIH_MURAH");
+  assert.strictEqual(describeStatus(-2543), "UTAMA_LEBIH_MURAH");
+  assert.strictEqual(describeStatus(0), "HARGA_SAMA");
 }
 
 async function main() {

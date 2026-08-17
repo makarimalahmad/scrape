@@ -329,18 +329,10 @@ async function scrapeStore(store, gameConfig, options) {
   };
 }
 
-function describeStatus(mainProduct, competitorProduct, difference) {
-  if (
-    competitorProduct.quantity !== null &&
-    mainProduct.quantity !== null &&
-    competitorProduct.quantity >= mainProduct.quantity &&
-    competitorProduct.price < mainProduct.price
-  ) {
-    return "Pembanding lebih banyak/sama dan lebih murah";
-  }
-  if (difference > 0) return "Situs utama lebih mahal";
-  if (difference < 0) return "Situs utama lebih murah";
-  return "Harga sama";
+function describeStatus(difference) {
+  if (difference > 0) return "PEMBANDING_LEBIH_MURAH";
+  if (difference < 0) return "UTAMA_LEBIH_MURAH";
+  return "HARGA_SAMA";
 }
 
 function createPairRows(gameConfig, mainStore, competitor) {
@@ -366,7 +358,7 @@ function createPairRows(gameConfig, mainStore, competitor) {
         "Harga/Unit Pembanding": "-",
         "Selisih Jumlah": "-",
         "Selisih Harga": "-",
-        Status: "Tidak ada pasangan di situs pembanding",
+        Status: "TIDAK_ADA_DI_PEMBANDING",
         "URL Utama": mainStore.url,
         "URL Pembanding": competitor.url,
         _difference: Number.NEGATIVE_INFINITY,
@@ -394,7 +386,7 @@ function createPairRows(gameConfig, mainStore, competitor) {
       "Harga/Unit Pembanding": formatPrice(competitorProduct.pricePerUnit),
       "Selisih Jumlah": match.quantityDifference,
       "Selisih Harga": formatPrice(Math.abs(difference)),
-      Status: describeStatus(mainProduct, competitorProduct, difference),
+      Status: describeStatus(difference),
       "URL Utama": mainStore.url,
       "URL Pembanding": competitor.url,
       _difference: difference,
@@ -418,7 +410,7 @@ function createPairRows(gameConfig, mainStore, competitor) {
       "Harga/Unit Pembanding": formatPrice(competitorProduct.pricePerUnit),
       "Selisih Jumlah": "-",
       "Selisih Harga": "-",
-      Status: "Produk hanya ada di situs pembanding",
+      Status: "HANYA_ADA_DI_PEMBANDING",
       "URL Utama": mainStore.url,
       "URL Pembanding": competitor.url,
       _difference: Number.NEGATIVE_INFINITY,
