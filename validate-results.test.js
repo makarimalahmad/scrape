@@ -4,6 +4,7 @@ const {
   normalizeTokopediaUrl,
   parseBlibliOptionText,
   parseDuniaGamesCardText,
+  parseRobloxProductCard,
   parseUniPinCardText,
   parseUPointCardText,
 } = require("./scrape");
@@ -56,6 +57,19 @@ function testKnownSiteCardParsers() {
     },
   );
   assert.strictEqual(parseBlibliOptionText("Produk belum dipilih"), null);
+  assert.deepStrictEqual(
+    parseRobloxProductCard("24.000 22.500 Rp 3,599 jt"),
+    { Produk: "24000 Robux", Harga: "Rp 3.599.000" },
+  );
+  assert.deepStrictEqual(parseRobloxProductCard("5.250 4.500 Rp 900 rb"), {
+    Produk: "5250 Robux",
+    Harga: "Rp 900.000",
+  });
+  assert.deepStrictEqual(parseRobloxProductCard("1,000 800 IDR 180.000"), {
+    Produk: "1000 Robux",
+    Harga: "Rp 180.000",
+  });
+  assert.strictEqual(parseRobloxProductCard("Roblox Premium"), null);
 }
 
 function testInvalidUnknownSite() {

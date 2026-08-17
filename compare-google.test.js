@@ -373,6 +373,9 @@ function testTemporaryScrapeErrors() {
   const retryableValidationError = new Error("DATA_TIDAK_VALID");
   retryableValidationError.retryable = true;
   assert.strictEqual(isTemporaryScrapeError(retryableValidationError), true);
+  const repeatedChallengeError = new Error("Cloudflare timeout");
+  repeatedChallengeError.retryable = false;
+  assert.strictEqual(isTemporaryScrapeError(repeatedChallengeError), false);
   assert.strictEqual(
     isTemporaryScrapeError(new Error("Data harga tidak ditemukan")),
     true,

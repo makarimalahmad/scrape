@@ -290,23 +290,62 @@ async function extractGopayRows(page) {
   );
 }
 
-async function extractRobloxRows(page) {
-  return page.locator("[data-product-id]").evaluateAll((cards) =>
-    cards.map((card) => {
-      const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
-      const amounts = text.match(/^([\d.]+)(?:\s+[\d.]+)?/);
-      const priceMatch = text.match(/Rp\s*([\d.,]+)\s*(rb|jt)?/i);
-      if (!amounts || !priceMatch) return {};
+function parseRobloxProductCard(text) {
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  const amountMatch = cleanText.match(/^([\d.,]+)/);
+  const priceMatch = cleanText.match(/(?:Rp\.?|IDR)\s*([\d.,]+)\s*(rb|ribu|jt|juta)?/i);
+  if (!amountMatch || !priceMatch) return null;
 
-      let price = Number(priceMatch[1].replace(/\./g, "").replace(",", "."));
-      if (/^rb$/i.test(priceMatch[2] || "")) price *= 1_000;
-      if (/^jt$/i.test(priceMatch[2] || "")) price *= 1_000_000;
-      return {
-        Produk: `${amounts[1].replace(/\./g, "")} Robux`,
-        Harga: `Rp ${Math.round(price).toLocaleString("id-ID")}`,
-      };
-    }),
+  const amount = Number(amountMatch[1].replace(/[.,]/g, ""));
+  const suffix = String(priceMatch[2] || "").toLowerCase();
+  const decimalPrice = Number(
+    priceMatch[1]
+      .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+      .replace(",", "."),
   );
+  const multiplier = /^(?:rb|ribu)$/.test(suffix)
+    ? 1_000
+    : /^(?:jt|juta)$/.test(suffix)
+      ? 1_000_000
+      : 1;
+  const price = Math.round(decimalPrice * multiplier);
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  return {
+    Produk: `${amount} Robux`,
+    Harga: `Rp ${price.toLocaleString("id-ID")}`,
+  };
+}
+
+async function extractRobloxRows(page) {
+  const cards = page.locator("[data-product-id]");
+  const ready = await cards
+    .filter({ hasText: /(?:Rp\.?|IDR)\s*[\d.,]+\s*(?:rb|ribu|jt|juta)?/i })
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!ready) return [];
+
+  const cardData = await cards.evaluateAll((elements) =>
+    elements.map((card) => ({
+      productId: card.getAttribute("data-product-id"),
+      text: card.innerText?.replace(/\s+/g, " ").trim() || "",
+    })),
+  );
+  const rows = [];
+  const seen = new Set();
+  for (const card of cardData) {
+    const row = parseRobloxProductCard(card.text);
+    if (!row) continue;
+    const key = card.productId || `${row.Produk}|${row.Harga}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(row);
+  }
+  return rows;
 }
 
 async function extractEbelanjaRows(page) {
@@ -456,7 +495,13 @@ async function extractSpecialRows(page, url) {
 }
 
 async function createOptimizedContext(browser) {
-  return browser.newContext({ locale: "id-ID" });
+  return browser.newContext({
+    locale: "id-ID",
+    timezoneId: "Asia/Jakarta",
+    extraHTTPHeaders: {
+      "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+    },
+  });
 }
 
 const CLOUDFLARE_CHALLENGE_PATTERN =
@@ -513,7 +558,10 @@ async function clickTurnstileFrame(page, frame) {
   return true;
 }
 
-async function solveCloudflareChallenge(page, timeout = 120_000) {
+async function solveCloudflareChallenge(
+  page,
+  { timeout = 120_000, maxClicks = Number.POSITIVE_INFINITY } = {},
+) {
   const deadline = Date.now() + timeout;
   let clearSince = null;
   let clickCount = 0;
@@ -530,6 +578,10 @@ async function solveCloudflareChallenge(page, timeout = 120_000) {
     }
 
     clearSince = null;
+    if (clickCount >= maxClicks) {
+      return { passed: false, clickCount, clickLimitReached: true };
+    }
+
     const waitBeforeNextClick = 1_750 - (Date.now() - lastClickAt);
     if (waitBeforeNextClick > 0) {
       await page.waitForTimeout(Math.min(waitBeforeNextClick, 250));
@@ -616,11 +668,18 @@ async function scrape(url, selector, headed, options = {}) {
     await page.locator("body").waitFor({ state: "visible", timeout: 15_000 });
 
     if (response?.status() === 403 || (await pageShowsCloudflareChallenge(page))) {
-      const challenge = await solveCloudflareChallenge(page, 120_000);
+      const isDitusi = url.hostname.replace(/^www\./, "") === "ditusi.co.id";
+      const challenge = await solveCloudflareChallenge(page, {
+        timeout: 120_000,
+        maxClicks: isDitusi ? 2 : Number.POSITIVE_INFINITY,
+      });
       if (!challenge.passed) {
-        throw new Error(
-          `Verifikasi Cloudflare tidak selesai dalam 2 menit setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`,
-        );
+        const message = challenge.clickLimitReached
+          ? `Cloudflare terus mengulang challenge setelah ${challenge.clickCount} klik otomatis. Situs dilewati tanpa retry langsung.`
+          : `Verifikasi Cloudflare tidak selesai dalam 2 menit setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
+        const error = new Error(message);
+        error.retryable = false;
+        throw error;
       }
 
       console.log(
@@ -1081,6 +1140,7 @@ module.exports = {
   normalizeTokopediaUrl,
   parseBlibliOptionText,
   parseDuniaGamesCardText,
+  parseRobloxProductCard,
   parseUniPinCardText,
   parseUPointCardText,
   saveInvalidReport,

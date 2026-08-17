@@ -224,6 +224,7 @@ async function searchGoogle(
 }
 
 function isTemporaryScrapeError(error) {
+  if (error.retryable === false) return false;
   if (error.retryable === true) return true;
   return /timeout|timed out|tidak selesai dimuat|data harga tidak ditemukan|err_http2_protocol_error|err_timed_out|connection reset|econnreset|socket hang up|network changed|eai_again|econnrefused|navigation failed because page crashed/i.test(
     error.message,
