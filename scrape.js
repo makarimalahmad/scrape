@@ -321,23 +321,99 @@ async function createOptimizedContext(browser) {
   return browser.newContext({ locale: "id-ID" });
 }
 
-async function triggerTurnstileCheckbox(page) {
-  const iframe = page.locator('iframe[src*="challenges.cloudflare.com"]');
-  if (!(await iframe.count())) return false;
+const CLOUDFLARE_CHALLENGE_PATTERN =
+  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
 
-  const checkbox = page
-    .frameLocator('iframe[src*="challenges.cloudflare.com"]')
-    .locator('input[type="checkbox"]');
-  const visible = await checkbox
-    .waitFor({ state: "visible", timeout: 3_000 })
-    .then(() => true)
-    .catch(() => false);
+async function findTurnstileFrame(page, timeout = 1_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const frame = page
+      .frames()
+      .find((candidate) =>
+        candidate.url().includes("challenges.cloudflare.com"),
+      );
+    if (frame) return frame;
+    await page.waitForTimeout(100);
+  }
+  return null;
+}
 
-  if (!visible) return false;
+async function pageShowsCloudflareChallenge(page) {
+  const title = await page.title().catch(() => "");
+  const bodyText = await page.locator("body").innerText().catch(() => "");
+  return CLOUDFLARE_CHALLENGE_PATTERN.test(`${title}\n${bodyText}`);
+}
 
-  await page.waitForTimeout(1_500 + Math.random() * 1_000);
-  await checkbox.click({ delay: 100 + Math.random() * 150 });
+async function clickTurnstileFrame(page, frame) {
+  const targets = [
+    frame.locator('input[type="checkbox"]'),
+    frame.locator('[role="checkbox"]'),
+    frame.locator(".ctp-checkbox-label"),
+    frame.locator("label").filter({ hasText: /verifikasi|verify|human/i }),
+  ];
+
+  for (const target of targets) {
+    const visible = await target.first().isVisible().catch(() => false);
+    if (!visible) continue;
+    const clicked = await target
+      .first()
+      .click({ delay: 75 + Math.random() * 75, timeout: 1_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (clicked) return true;
+  }
+
+  const frameElement = await frame.frameElement().catch(() => null);
+  const box = await frameElement?.boundingBox().catch(() => null);
+  if (!box) return false;
+
+  await page.mouse.click(
+    box.x + Math.min(28, box.width / 2),
+    box.y + box.height / 2,
+    { delay: 75 + Math.random() * 75 },
+  );
   return true;
+}
+
+async function solveCloudflareChallenge(page, timeout = 120_000) {
+  const deadline = Date.now() + timeout;
+  let clearSince = null;
+  let clickCount = 0;
+  let lastClickAt = 0;
+
+  while (Date.now() < deadline) {
+    if (!(await pageShowsCloudflareChallenge(page))) {
+      clearSince ??= Date.now();
+      if (Date.now() - clearSince >= 1_500) {
+        return { passed: true, clickCount };
+      }
+      await page.waitForTimeout(100);
+      continue;
+    }
+
+    clearSince = null;
+    const waitBeforeNextClick = 1_750 - (Date.now() - lastClickAt);
+    if (waitBeforeNextClick > 0) {
+      await page.waitForTimeout(Math.min(waitBeforeNextClick, 250));
+      continue;
+    }
+
+    const frame = await findTurnstileFrame(
+      page,
+      Math.min(1_000, Math.max(100, deadline - Date.now())),
+    );
+    if (!frame) continue;
+
+    if (await clickTurnstileFrame(page, frame)) {
+      clickCount += 1;
+      lastClickAt = Date.now();
+      console.log(`Klik checkbox Cloudflare (${clickCount})...`);
+    } else {
+      await page.waitForTimeout(100);
+    }
+  }
+
+  return { passed: false, clickCount };
 }
 
 async function waitForProductData(page, timeout = 20_000, hostname = "") {
@@ -401,50 +477,17 @@ async function scrape(url, selector, headed, options = {}) {
     }
     await page.locator("body").waitFor({ state: "visible", timeout: 15_000 });
 
-    const blockedPattern =
-      /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
-    const pageShowsChallenge = async () => {
-      const title = await page.title();
-      const bodyText = await page.locator("body").innerText();
-      return blockedPattern.test(`${title}\n${bodyText}`);
-    };
-
-    if (response?.status() === 403 || (await pageShowsChallenge())) {
-      await triggerTurnstileCheckbox(page).catch(() => false);
-
-      if (await pageShowsChallenge()) {
-        if (!headed) {
-          throw new Error(
-            "Situs menampilkan verifikasi Cloudflare. Jalankan ulang dengan --headed untuk menyelesaikan CAPTCHA manual.",
-          );
-        }
-
-        console.log(
-          `Selesaikan CAPTCHA untuk ${url.hostname}. Scraper lanjut otomatis setelah halaman produk terbuka...`,
+    if (response?.status() === 403 || (await pageShowsCloudflareChallenge(page))) {
+      const challenge = await solveCloudflareChallenge(page, 120_000);
+      if (!challenge.passed) {
+        throw new Error(
+          `Verifikasi Cloudflare tidak selesai dalam 2 menit setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`,
         );
-
-        const challengePassed = await page
-          .waitForFunction(
-            () => {
-              const text = `${document.title}\n${document.body?.innerText || ""}`;
-              return !/sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i.test(
-                text,
-              );
-            },
-            null,
-            { timeout: 180_000 },
-          )
-          .then(() => true)
-          .catch(() => false);
-
-        if (!challengePassed || (await pageShowsChallenge())) {
-          throw new Error(
-            "Verifikasi Cloudflare tidak selesai dalam 3 menit. Coba ganti jaringan atau jalankan ulang beberapa saat lagi.",
-          );
-        }
       }
 
-      console.log("Cloudflare lolos. Menunggu produk dimuat...");
+      console.log(
+        `Cloudflare lolos setelah ${challenge.clickCount} klik. Menunggu produk dimuat...`,
+      );
       await waitForProductData(page, 30_000, url.hostname);
     }
 
