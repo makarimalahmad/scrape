@@ -78,11 +78,12 @@ function parseUPointCardText(text) {
   return { Produk: match[1].trim(), Harga: `Rp ${match[2]}` };
 }
 
-function parseDuniaGamesCardText(text, productName) {
+function parseDuniaGamesCardText(text, productName, priceText = null) {
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
   const product = String(productName || "").replace(/\s+/g, " ").trim();
-  const prices = cleanText.match(/\b\d{1,3}(?:\.\d{3})+\b/g) || [];
-  const price = prices.at(-1);
+  const explicitPrice = String(priceText || "").replace(/\s+/g, " ").trim();
+  const prices = cleanText.match(/\b\d{1,3}(?:\.\d{3})*\b/g) || [];
+  const price = explicitPrice.match(/^\d{1,3}(?:\.\d{3})*$/)?.[0] || prices.at(-1);
   if (!product || !price || Number(price.replace(/\./g, "")) <= 0) return null;
   return { Produk: product, Harga: `Rp ${price}` };
 }
@@ -137,16 +138,35 @@ async function extractUPointRows(page) {
 }
 
 async function extractDuniaGamesRows(page) {
+  const ready = await page
+    .waitForFunction(
+      () =>
+        Array.from(document.querySelectorAll(".denom")).some((card) => {
+          const product = card.querySelector(".head-dnm")?.textContent?.trim();
+          const price = card.querySelector(".price-dnm .pr")?.textContent?.trim();
+          return Boolean(product && /^\d{1,3}(?:\.\d{3})*$/.test(price || ""));
+        }),
+      null,
+      { timeout: 30_000, polling: 250 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!ready) return [];
+
   return page.locator(".denom").evaluateAll((cards) =>
     cards
       .map((card) => {
-        const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
-        const product = card.querySelector(".head-dnm")?.innerText
+        const product = card.querySelector(".head-dnm")?.textContent
           ?.replace(/\s+/g, " ")
           .trim();
-        const prices = text.match(/\b\d{1,3}(?:\.\d{3})+\b/g) || [];
-        const price = prices.at(-1);
-        if (!product || !price || Number(price.replace(/\./g, "")) <= 0) {
+        const price = card.querySelector(".price-dnm .pr")?.textContent
+          ?.replace(/\s+/g, " ")
+          .trim();
+        if (
+          !product ||
+          !/^\d{1,3}(?:\.\d{3})*$/.test(price || "") ||
+          Number(price.replace(/\./g, "")) <= 0
+        ) {
           return null;
         }
         return { Produk: product, Harga: `Rp ${price}` };
@@ -415,18 +435,19 @@ async function extractShopeeRows(page) {
   return rows;
 }
 
-async function extractDitusiRows(page) {
-  const bodyText = await page.locator("body").innerText();
+function parseDitusiProductRows(bodyText) {
   const markerMatches = Array.from(
-    bodyText.matchAll(/Pilih Item Top Up (?:Free Fire|Roblox - Login)/gi),
+    String(bodyText || "").matchAll(
+      /Pilih Item Top Up (?:Free Fire|Roblox\s*-\s*Login)/gi,
+    ),
   );
   const marker = markerMatches.at(-1);
   if (!marker) return [];
   const section = bodyText.slice(marker.index + marker[0].length);
-
   const rows = [];
   const lines = section.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const productPattern = /^\d[\d.]*\s+(?:Diamonds?|Robux)(?:\s*\+\s*\(Bonus\s+\d[\d.]*\))?$/i;
+  const productPattern = /^\d[\d.]*\s+(?:Diamonds?|Robux)(?:\s+USN)?(?:\s*\+\s*\(Bonus\s+\d[\d.]*\))?$/i;
+
   for (let index = 0; index < lines.length; index += 1) {
     if (!productPattern.test(lines[index])) continue;
 
@@ -441,6 +462,25 @@ async function extractDitusiRows(page) {
     }
   }
   return rows;
+}
+
+async function extractDitusiRows(page) {
+  const ready = await page
+    .waitForFunction(
+      () =>
+        /Pilih Item Top Up Roblox\s*-\s*Login[\s\S]*?\d[\d.]*\s+Robux(?:\s+USN)?[\s\S]*?Rp\.?\s*[\d.]+/i.test(
+          document.body?.innerText || "",
+        ) ||
+        /Pilih Item Top Up Free Fire[\s\S]*?\d[\d.]*\s+Diamonds?[\s\S]*?Rp\.?\s*[\d.]+/i.test(
+          document.body?.innerText || "",
+        ),
+      null,
+      { timeout: 30_000, polling: 250 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!ready) return [];
+  return parseDitusiProductRows(await page.locator("body").innerText());
 }
 
 async function extractVexagameRows(page) {
@@ -498,9 +538,6 @@ async function createOptimizedContext(browser) {
   return browser.newContext({
     locale: "id-ID",
     timezoneId: "Asia/Jakarta",
-    extraHTTPHeaders: {
-      "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
-    },
   });
 }
 
@@ -610,14 +647,14 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
   const domain = hostname.replace(/^www\./, "");
   const readinessSelectors = {
     "upoint.id": ".cursor-pointer",
-    "duniagames.co.id": ".denom",
+    "duniagames.co.id": ".denom .price-dnm .pr",
     "unipin.com": ".denom-container > button",
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
     const ready = await page
       .locator(readinessSelector)
-      .filter({ hasText: /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|\b[1-9]\d{0,2}(?:\.\d{3})+)\b/i })
+      .filter({ hasText: /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|^\s*[1-9]\d{0,2}(?:\.\d{3})*\s*$)/i })
       .first()
       .waitFor({ state: "visible", timeout })
       .then(() => true)
@@ -1139,6 +1176,7 @@ module.exports = {
   normalizeMobapayProductName,
   normalizeTokopediaUrl,
   parseBlibliOptionText,
+  parseDitusiProductRows,
   parseDuniaGamesCardText,
   parseRobloxProductCard,
   parseUniPinCardText,

@@ -1,3 +1,4 @@
+require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("./playwright");
@@ -922,6 +923,7 @@ module.exports = {
   isTopUpCompetitorResult,
   mapWithConcurrency,
   normalizeStoreUrl,
+  scrapeStore,
   scrapeWithRetry,
   searchGoogle,
   selectGoogleCompetitors,

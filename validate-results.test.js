@@ -3,6 +3,7 @@ const {
   normalizeMobapayProductName,
   normalizeTokopediaUrl,
   parseBlibliOptionText,
+  parseDitusiProductRows,
   parseDuniaGamesCardText,
   parseRobloxProductCard,
   parseUniPinCardText,
@@ -18,6 +19,14 @@ function testKnownSiteCardParsers() {
   assert.deepStrictEqual(
     parseDuniaGamesCardText("3 Diamonds\n1.195", "3 Diamonds"),
     { Produk: "3 Diamonds", Harga: "Rp 1.195" },
+  );
+  assert.deepStrictEqual(
+    parseDuniaGamesCardText("5 Diamond\n960", "5 Diamond", "960"),
+    { Produk: "5 Diamond", Harga: "Rp 960" },
+  );
+  assert.deepStrictEqual(
+    parseDuniaGamesCardText("12 Diamond\n1.921", "12 Diamond", "1.921"),
+    { Produk: "12 Diamond", Harga: "Rp 1.921" },
   );
   assert.deepStrictEqual(
     parseUniPinCardText("5 Diamonds + 0 Bonus\nIDR 1.425"),
@@ -70,6 +79,24 @@ function testKnownSiteCardParsers() {
     Harga: "Rp 180.000",
   });
   assert.strictEqual(parseRobloxProductCard("Roblox Premium"), null);
+  assert.deepStrictEqual(
+    parseDitusiProductRows(`
+      Pilih Item Top Up Roblox - Login
+      500 Robux USN
+      Rp. 78.300
+      RM. 17.79
+      1000 Robux USN
+      Rp. 156.600
+      RM. 35.57
+      Metode Pembayaran
+      QRIS
+      Rp 80.012
+    `),
+    [
+      { Produk: "500 Robux USN", Harga: "Rp. 78.300" },
+      { Produk: "1000 Robux USN", Harga: "Rp. 156.600" },
+    ],
+  );
 }
 
 function testInvalidUnknownSite() {

@@ -5,16 +5,19 @@
   "main": "index.js",
   "scripts": {
     "scrape": "node scrape.js",
+    "scrape:new": "node scrape-new.js",
     "compare:url": "node compare-url.js",
     "compare:google": "node compare-google.js",
     "search:top": "node search-top-and-scrape.js",
-    "test": "node --check scrape.js && node --check compare-url.js && node --check search-top-and-scrape.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js && node validate-results.test.js && node compare-google.test.js"
+    "test": "node --check scrape.js && node --check scrape-new.js && node --check compare-url.js && node --check search-top-and-scrape.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js && node validate-results.test.js && node compare-google.test.js && node scrape-new.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "playwright": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
