@@ -200,12 +200,18 @@ function parseBlibliOptionText(text) {
 }
 
 async function extractBlibliRows(page) {
-  const productDropdown = page.locator("#nominalField .blu-dropdown-field");
   const ready = await page
     .waitForFunction(
       () => {
-        const input = document.querySelector("#nominalField input");
-        return Boolean(input?.value?.trim());
+        const containers = document.querySelectorAll(".blu-field__container");
+        for (const container of containers) {
+          const label = container.querySelector(".blu-field__label");
+          if (label && /produk/i.test(label.textContent)) {
+            const input = container.querySelector("input");
+            return Boolean(input?.value?.trim());
+          }
+        }
+        return false;
       },
       null,
       { timeout: 30_000, polling: 250 },
@@ -214,30 +220,65 @@ async function extractBlibliRows(page) {
     .catch(() => false);
   if (!ready) return [];
 
-  const options = page.locator("#nominalField .field__dropdown-list");
-  for (let attempt = 0; attempt < 3 && !(await options.count()); attempt += 1) {
-    await productDropdown.click({ force: true, timeout: 2_000 }).catch(() => {});
-    await options
-      .first()
-      .waitFor({ state: "attached", timeout: 2_000 })
-      .catch(() => {});
+  const produkContainer = page
+    .locator(".blu-field__container")
+    .filter({ has: page.locator(".blu-field__label", { hasText: /^Produk$/i }) });
+  const produkInput = produkContainer.locator("input");
+  const options = page.locator(".blu-dropdown-tray .blu-list");
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await produkInput.click({ force: true, timeout: 2_000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    if ((await options.count()) > 0) break;
+  }
+  if (!(await options.count())) return [];
+
+  const activeTray = page
+    .locator(".blu-dropdown-tray")
+    .filter({ has: page.locator(".blu-list") })
+    .first();
+
+  const seen = new Set();
+  const rows = [];
+
+  const collectVisible = async () => {
+    const items = await options.evaluateAll((elements) =>
+      elements
+        .map((item) => {
+          const text = item.textContent?.replace(/\s+/g, " ").trim();
+          return text;
+        })
+        .filter(Boolean),
+    );
+    for (const text of items) {
+      const parsed = parseBlibliOptionText(text);
+      if (parsed) {
+        const key = `${parsed.Produk}|${parsed.Harga}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          rows.push(parsed);
+        }
+      }
+    }
+  };
+
+  // Scroll to top first
+  await activeTray.evaluate((el) => (el.scrollTop = 0)).catch(() => {});
+  await page.waitForTimeout(300);
+  await collectVisible();
+
+  // Scroll down incrementally until no new items appear
+  for (let i = 0; i < 50; i += 1) {
+    const prevCount = rows.length;
+    await activeTray.evaluate((el) => (el.scrollTop += 200)).catch(() => {});
+    await page.waitForTimeout(200);
+    await collectVisible();
+    const atBottom = await activeTray
+      .evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 5)
+      .catch(() => true);
+    if (atBottom && rows.length === prevCount) break;
   }
 
-  return options.evaluateAll((elements) =>
-    elements
-      .map((element) => {
-        const product = element
-          .querySelector(".field__dropdown-list-text")
-          ?.textContent?.replace(/\s+/g, " ")
-          .trim();
-        const price = element
-          .querySelector(".field__dropdown-list-img")
-          ?.textContent?.replace(/\s+/g, " ")
-          .trim();
-        return product && price ? { Produk: product, Harga: price } : null;
-      })
-      .filter(Boolean),
-  );
+  return rows;
 }
 
 async function extractTokopediaRows(page) {

@@ -12,7 +12,16 @@ Node.js price scraper for Mobile Legends, Free Fire, and Roblox. It finds top or
 - `product-matcher.js`: product normalization and price matching.
 - `validate-results.js`: scrape quality checks and confidence scoring.
 - `playwright.js`: shared Playwright Extra Chromium instance with stealth plugin.
-- `run-daily.sh`: VPS daily runner.
+- `run-daily.sh`: VPS daily runner for compare-google.js.
+- `scrape-new.js`: Excel (.xlsx) comparison exporter with product anchors and lowest/highest benchmark comparisons.
+- `scrape-daily.sh`: VPS daily runner for scrape-new.js.
+
+## Environment & Secrets
+
+- For local development, secrets (`SERPAPI_KEY`) reside in `.env` (tracked template is `.env.example`).
+- Always load dotenv with `require("dotenv").config({ quiet: true });` so console and cron logs stay clean without banner/tips.
+- VPS secrets reside at `/home/ubuntu/.config/price-scraper/env` and are loaded via runner scripts. Dotenv does not override existing environment variables.
+- Never place `SERPAPI_KEY` or other secrets in source code, Git commits, output, or logs.
 
 ## Required Checks
 
@@ -67,10 +76,12 @@ Never overwrite a previous run directory. Do not commit generated output, CSV fi
 - VPS secrets: `/home/ubuntu/.config/price-scraper/env`.
 - Never place `SERPAPI_KEY` or other secrets in source, Git, output, or logs.
 - Do not update, restart, or modify VPS automatically. Push GitHub only when explicitly requested. Provide VPS pull commands for the user to run manually.
-- Do not modify the VPS-specific `run-daily.sh`, cron configuration, `.cron.lock`, or `cron.log` unless explicitly requested.
+- VPS Git configuration should remain non-interactive (`git config pull.rebase true` and `git config core.mergeoptions "--no-edit"` so `git pull origin main` never triggers Nano/editors).
+- Do not modify the VPS-specific `run-daily.sh`, `scrape-daily.sh`, cron configuration, `.cron.lock`, or `cron.log` unless explicitly requested.
 
 ## Git Rules
 
 - Never commit or push unless explicitly requested.
 - Before commit, inspect status, diff, recent log, and secrets; stage only intended source and tests.
+- Always verify `.gitignore` excludes `.env`, `output/`, `node_modules/`, and logs before committing.
 - Keep unrelated local or VPS changes intact.
