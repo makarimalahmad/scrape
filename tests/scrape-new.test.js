@@ -1,5 +1,5 @@
 const assert = require("assert");
-const { selectCheapestProducts } = require("./product-matcher");
+const { selectCheapestProducts } = require("../product-matcher");
 const {
   calculateComparison,
   createScrapeRows,
@@ -7,7 +7,7 @@ const {
   createProductAnchors,
   matchStoreToAnchors,
   selectBenchmark,
-} = require("./scrape-new");
+} = require("../scrape-new");
 
 function createStore(name, position, rows, game = "mobile-legends") {
   return {

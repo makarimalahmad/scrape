@@ -9,8 +9,8 @@ const {
   parseRobloxProductCard,
   parseUniPinCardText,
   parseUPointCardText,
-} = require("./scrape");
-const { validateScrapeResults } = require("./validate-results");
+} = require("../scrape");
+const { validateScrapeResults } = require("../validate-results");
 
 function testKnownSiteCardParsers() {
   assert.deepStrictEqual(parseUPointCardText("5 Diamonds\nFrom\n1.579"), {

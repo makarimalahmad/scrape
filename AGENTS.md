@@ -33,7 +33,7 @@ npm test
 
 For browser-related changes, also run a Chromium smoke test. For site-specific extractors, verify the affected live URL when practical without wasting SerpAPI quota.
 
-Keep regression tests. Do not delete `compare-google.test.js` or `validate-results.test.js` merely to simplify the repository.
+Keep regression tests. Do not delete `tests/compare-google.test.js` or `tests/validate-results.test.js` merely to simplify the repository.
 
 ## Output Rules
 

@@ -6,7 +6,7 @@ const {
   findMatches,
   parseProduct,
   selectCheapestProducts,
-} = require("./product-matcher");
+} = require("../product-matcher");
 const {
   createOverallSummary,
   createPairFileName,
@@ -22,8 +22,8 @@ const {
   scrapeWithRetry,
   searchGoogle,
   selectGoogleCompetitors,
-} = require("./compare-google");
-const { GAME_CONFIGS, isMainStoreUrl } = require("./compare-google-config");
+} = require("../compare-google");
+const { GAME_CONFIGS, isMainStoreUrl } = require("../compare-google-config");
 
 function testGameConfiguration() {
   assert.strictEqual(GAME_CONFIGS.length, 3);
