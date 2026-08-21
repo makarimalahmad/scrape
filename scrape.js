@@ -727,6 +727,27 @@ async function humanMoveAndClick(page, targetX, targetY) {
 }
 
 async function clickTurnstileFrame(page, frame) {
+  const targets = [
+    frame.locator('input[type="checkbox"]'),
+    frame.locator('[role="checkbox"]'),
+    frame.locator(".ctp-checkbox-label"),
+    frame.locator("label").filter({ hasText: /verifikasi|verify|human/i }),
+    frame.locator("#challenge-stage"),
+    frame.locator(".cb-c"),
+    frame.locator("body"),
+  ];
+
+  for (const target of targets) {
+    const visible = await target.first().isVisible().catch(() => false);
+    if (!visible) continue;
+    const clicked = await target
+      .first()
+      .click({ delay: 75 + Math.random() * 75, timeout: 2_000, force: true })
+      .then(() => true)
+      .catch(() => false);
+    if (clicked) return true;
+  }
+
   const frameElement = await frame.frameElement().catch(() => null);
   const box = await frameElement?.boundingBox().catch(() => null);
   if (!box) return false;
@@ -790,8 +811,8 @@ async function solveCloudflareChallenge(
     if (
       !isChallenge &&
       !frame &&
-      Date.now() - lastClickAt >= 5_000 &&
-      Date.now() - startedAt >= 6_000
+      Date.now() - lastClickAt >= 6_000 &&
+      Date.now() - startedAt >= 8_000
     ) {
       return { passed: true, clickCount };
     }
