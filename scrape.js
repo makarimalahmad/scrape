@@ -661,9 +661,9 @@ async function createOptimizedContext(browser) {
 }
 
 const CLOUDFLARE_CHALLENGE_PATTERN =
-  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda|tunggu sebentar|just a moment|verifying you are human/i;
+  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
 
-async function findTurnstileFrame(page, timeout = 2_000) {
+async function findTurnstileFrame(page, timeout = 1_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const frame = page
@@ -678,52 +678,9 @@ async function findTurnstileFrame(page, timeout = 2_000) {
 }
 
 async function pageShowsCloudflareChallenge(page) {
-  const hasTurnstileFrame = page
-    .frames()
-    .some((candidate) =>
-      candidate.url().includes("challenges.cloudflare.com"),
-    );
-  if (hasTurnstileFrame) return true;
   const title = await page.title().catch(() => "");
   const bodyText = await page.locator("body").innerText().catch(() => "");
   return CLOUDFLARE_CHALLENGE_PATTERN.test(`${title}\n${bodyText}`);
-}
-
-function generateBezierPoints(startX, startY, endX, endY, steps = 20) {
-  const midX = (startX + endX) / 2 + (Math.random() - 0.5) * 80;
-  const midY = (startY + endY) / 2 + (Math.random() - 0.5) * 80;
-  const points = [];
-  for (let i = 0; i <= steps; i += 1) {
-    const t = i / steps;
-    const x = Math.round(
-      (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * midX + t * t * endX,
-    );
-    const y = Math.round(
-      (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * midY + t * t * endY,
-    );
-    points.push({ x, y });
-  }
-  return points;
-}
-
-async function humanMoveAndClick(page, targetX, targetY) {
-  const startX = Math.round(100 + Math.random() * 300);
-  const startY = Math.round(100 + Math.random() * 300);
-  const steps = 18 + Math.floor(Math.random() * 10);
-  const points = generateBezierPoints(startX, startY, targetX, targetY, steps);
-
-  for (const point of points) {
-    await page.mouse.move(point.x, point.y);
-    await page.waitForTimeout(8 + Math.random() * 12);
-  }
-
-  // Hover sebentar di atas target (seperti refleks manusia)
-  await page.waitForTimeout(150 + Math.random() * 200);
-
-  // Klik alami: tekan -> jeda tahan -> lepas
-  await page.mouse.down();
-  await page.waitForTimeout(60 + Math.random() * 80);
-  await page.mouse.up();
 }
 
 async function clickTurnstileFrame(page, frame) {
@@ -732,9 +689,6 @@ async function clickTurnstileFrame(page, frame) {
     frame.locator('[role="checkbox"]'),
     frame.locator(".ctp-checkbox-label"),
     frame.locator("label").filter({ hasText: /verifikasi|verify|human/i }),
-    frame.locator("#challenge-stage"),
-    frame.locator(".cb-c"),
-    frame.locator("body"),
   ];
 
   for (const target of targets) {
@@ -742,7 +696,7 @@ async function clickTurnstileFrame(page, frame) {
     if (!visible) continue;
     const clicked = await target
       .first()
-      .click({ delay: 75 + Math.random() * 75, timeout: 2_000, force: true })
+      .click({ delay: 75 + Math.random() * 75, timeout: 1_000 })
       .then(() => true)
       .catch(() => false);
     if (clicked) return true;
@@ -752,14 +706,11 @@ async function clickTurnstileFrame(page, frame) {
   const box = await frameElement?.boundingBox().catch(() => null);
   if (!box) return false;
 
-  const targetX = Math.round(
-    box.x + Math.min(28, box.width / 2) + (Math.random() - 0.5) * 6,
+  await page.mouse.click(
+    box.x + Math.min(28, box.width / 2),
+    box.y + box.height / 2,
+    { delay: 75 + Math.random() * 75 },
   );
-  const targetY = Math.round(
-    box.y + box.height / 2 + (Math.random() - 0.5) * 6,
-  );
-
-  await humanMoveAndClick(page, targetX, targetY);
   return true;
 }
 
@@ -767,57 +718,45 @@ async function solveCloudflareChallenge(
   page,
   { timeout = 120_000, maxClicks = Number.POSITIVE_INFINITY } = {},
 ) {
-  const startedAt = Date.now();
-  const deadline = startedAt + timeout;
+  const deadline = Date.now() + timeout;
+  let clearSince = null;
   let clickCount = 0;
-  let lastClickAt = startedAt;
+  let lastClickAt = 0;
 
   while (Date.now() < deadline) {
-    const isChallenge = await pageShowsCloudflareChallenge(page);
-    const bodyText = await page.locator("body").innerText().catch(() => "");
-    const hasProducts =
-      /(?:Rp\.?|IDR)\s*\d/i.test(bodyText) &&
-      /(?:diamond|robux|member|pass|voucher|token|point)/i.test(bodyText);
-
-    if (!isChallenge && hasProducts) {
-      return { passed: true, clickCount };
+    if (!(await pageShowsCloudflareChallenge(page))) {
+      clearSince ??= Date.now();
+      if (Date.now() - clearSince >= 1_500) {
+        return { passed: true, clickCount };
+      }
+      await page.waitForTimeout(100);
+      continue;
     }
 
+    clearSince = null;
     if (clickCount >= maxClicks) {
       return { passed: false, clickCount, clickLimitReached: true };
     }
 
+    const waitBeforeNextClick = 1_750 - (Date.now() - lastClickAt);
+    if (waitBeforeNextClick > 0) {
+      await page.waitForTimeout(Math.min(waitBeforeNextClick, 250));
+      continue;
+    }
+
     const frame = await findTurnstileFrame(
       page,
-      Math.min(2_000, Math.max(100, deadline - Date.now())),
+      Math.min(1_000, Math.max(100, deadline - Date.now())),
     );
+    if (!frame) continue;
 
-    if (frame) {
-      const waitBeforeNextClick = 2_000 - (Date.now() - lastClickAt);
-      if (waitBeforeNextClick > 0) {
-        await page.waitForTimeout(Math.min(waitBeforeNextClick, 500));
-        continue;
-      }
-
-      if (await clickTurnstileFrame(page, frame)) {
-        clickCount += 1;
-        lastClickAt = Date.now();
-        console.log(`Klik checkbox Cloudflare (${clickCount})...`);
-        await page.waitForTimeout(2_500);
-        continue;
-      }
+    if (await clickTurnstileFrame(page, frame)) {
+      clickCount += 1;
+      lastClickAt = Date.now();
+      console.log(`Klik checkbox Cloudflare (${clickCount})...`);
+    } else {
+      await page.waitForTimeout(100);
     }
-
-    if (
-      !isChallenge &&
-      !frame &&
-      Date.now() - lastClickAt >= 6_000 &&
-      Date.now() - startedAt >= 8_000
-    ) {
-      return { passed: true, clickCount };
-    }
-
-    await page.waitForTimeout(400);
   }
 
   return { passed: false, clickCount };
