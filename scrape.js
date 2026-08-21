@@ -827,9 +827,13 @@ async function scrapeWithPuppeteerRealBrowser(url, headed = false) {
   let session = null;
   try {
     session = await connect({
-      headless: !headed,
+      headless: false, // Wajib false agar Xvfb otomatis aktif di Linux untuk Turnstile auto-click
       turnstile: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
     });
     const { browser, page } = session;
 
