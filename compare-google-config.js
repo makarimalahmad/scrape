@@ -13,6 +13,12 @@ const GAME_CONFIGS = [
         url: "https://duniagames.co.id/top-up/item/mobile-legends",
       },
     ],
+    priorityStores: [
+      {
+        name: "itemku.com",
+        url: "https://itemku.com/id/g/mobile-legends/top-up",
+      },
+    ],
   },
   {
     id: "free-fire",
@@ -28,6 +34,12 @@ const GAME_CONFIGS = [
         url: "https://duniagames.co.id/top-up/item/freefire",
       },
     ],
+    priorityStores: [
+      {
+        name: "itemku.com",
+        url: "https://itemku.com/id/g/garena-free-fire/top-up",
+      },
+    ],
   },
   {
     id: "roblox",
@@ -41,6 +53,12 @@ const GAME_CONFIGS = [
       {
         name: "DuniaGames",
         url: "https://duniagames.co.id/top-up/item/roblox-voucher",
+      },
+    ],
+    priorityStores: [
+      {
+        name: "itemku.com",
+        url: "https://itemku.com/id/g/roblox/robux-5-hari",
       },
     ],
   },

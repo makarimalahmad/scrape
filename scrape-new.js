@@ -64,6 +64,12 @@ function createProductAnchors(mainStores) {
   });
 }
 
+// ============================================================================
+// PERHITUNGAN 1: Menentukan Harga Pembanding (Benchmark) Terendah & Tertinggi
+// ============================================================================
+// Fungsi ini mengurutkan seluruh toko kompetitor berdasarkan harga produk:
+// - "lowest"  : mencari toko dengan harga paling murah (terendah) di pasar.
+// - "highest" : mencari toko dengan harga paling mahal (tertinggi) di pasar.
 function selectBenchmark(entries, direction) {
   if (!entries.length) return null;
   return [...entries].sort((first, second) => {
@@ -78,6 +84,16 @@ function selectBenchmark(entries, direction) {
   })[0];
 }
 
+// ============================================================================
+// PERHITUNGAN 2: Menghitung Selisih Rupiah & Persentase (%)
+// ============================================================================
+// Rumus yang digunakan:
+// 1. Selisih (Nominal) = Harga Toko Utama (UPoint / DuniaGames) - Harga Benchmark (Terendah / Tertinggi)
+//    - Jika Positif (+) : Toko utama lebih mahal dibanding harga benchmark.
+//    - Jika Negatif (-) : Toko utama lebih murah dibanding harga benchmark.
+//
+// 2. Persentase (%)   = (Selisih / Harga Toko Utama) * 100
+//    - Contoh: Selisih Rp 75 pada harga Rp 960 -> (75 / 960) * 100 = 7.8125%
 function calculateComparison(mainProduct, benchmark) {
   if (!mainProduct || !benchmark) return { difference: "-", percentage: "-" };
   const difference = mainProduct.price - benchmark.product.price;
@@ -188,6 +204,8 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
     const values = [row.Produk];
     for (const rankedStore of ranking) values.push(row[rankedStore.store]);
     values.push("");
+    // Memasukkan data harga toko utama, selisih rupiah, dan persentase desimal ke Excel:
+    // (Persen string "7.8125%" dibagi 100 menjadi angka 0.078125 agar dikenali sebagai tipe angka oleh Excel)
     values.push(
       row["Harga Terendah | UPoint"],
       row["Harga Terendah | UPoint Selisih"],
@@ -236,6 +254,9 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
   ]) {
     worksheet.getColumn(column).numFmt = rupiahFormat;
   }
+  // ============================================================================
+  // FORMATTING EXCEL: Menampilkan Kolom Persen dengan 4 Angka Desimal (0.0000%)
+  // ============================================================================
   worksheet.getColumn(lowestStart + 2).numFmt = "0.0000%";
   worksheet.getColumn(lowestStart + 5).numFmt = "0.0000%";
   worksheet.getColumn(highestStart + 2).numFmt = "0.0000%";
@@ -268,6 +289,56 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
       }
     }
   }
+
+  // ============================================================================
+  // HIGHLIGHT WARNA: Hijau Muda (Harga Termurah) & Merah Muda (Harga Termahal)
+  // ============================================================================
+  const lowestFill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE2F0D9" }, // Soft Pastel Green
+  };
+  const highestFill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFFCE4D6" }, // Soft Pastel Peach/Red
+  };
+  const lowestFont = {
+    color: { argb: "FF385723" }, // Teks Hijau Tua
+    bold: true,
+  };
+  const highestFont = {
+    color: { argb: "FFC00000" }, // Teks Merah Tua
+    bold: true,
+  };
+
+  for (let rowIdx = 3; rowIdx <= worksheet.rowCount; rowIdx += 1) {
+    const competitorPrices = [];
+    for (let colIdx = competitorStart; colIdx < spacerAfterCompetitors; colIdx += 1) {
+      const val = worksheet.getCell(rowIdx, colIdx).value;
+      if (typeof val === "number" && !Number.isNaN(val) && val > 0) {
+        competitorPrices.push(val);
+      }
+    }
+    if (competitorPrices.length > 1) {
+      const minPrice = Math.min(...competitorPrices);
+      const maxPrice = Math.max(...competitorPrices);
+      // Hanya warnai jika ada perbedaan harga di baris tersebut
+      if (minPrice !== maxPrice) {
+        for (let colIdx = competitorStart; colIdx < spacerAfterCompetitors; colIdx += 1) {
+          const cell = worksheet.getCell(rowIdx, colIdx);
+          if (cell.value === minPrice) {
+            cell.fill = lowestFill;
+            cell.font = lowestFont;
+          } else if (cell.value === maxPrice) {
+            cell.fill = highestFill;
+            cell.font = highestFont;
+          }
+        }
+      }
+    }
+  }
+
   return { workbook, worksheet };
 }
 
@@ -381,8 +452,17 @@ async function main() {
   }
   const selectedGames = gameId === "all"
     ? GAME_CONFIGS
-    : GAME_CONFIGS.filter((game) => game.id === gameId);
-  if (!selectedGames.length) throw new Error(`Game tidak valid: ${gameId}.`);
+    : GAME_CONFIGS.filter((game) =>
+        gameId
+          .split(",")
+          .map((id) => id.trim().toLowerCase())
+          .includes(game.id),
+      );
+  if (!selectedGames.length) {
+    throw new Error(
+      `Game tidak valid: ${gameId}. Pilih all, mobile-legends, free-fire, roblox, atau kombinasi koma (contoh: free-fire,roblox).`,
+    );
+  }
 
   const headed = process.argv.includes("--headed");
   const attemptsValue = Number(getArgument("attempts", "3"));

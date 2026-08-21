@@ -1,5 +1,6 @@
 const assert = require("assert");
 const {
+  extractProductPairsFromJson,
   normalizeMobapayProductName,
   normalizeTokopediaUrl,
   parseBlibliOptionText,
@@ -205,6 +206,28 @@ function testValidUnknownSite() {
   assert.strictEqual(result.status, "VALID");
 }
 
+function testExtractProductPairsFromJson() {
+  const payload = {
+    code: 200,
+    data: {
+      products: [
+        { name: "100 Diamonds", price: 17760 },
+        { name: "310 Diamonds", price: 54390 },
+      ],
+    },
+  };
+  const extracted = extractProductPairsFromJson(payload);
+  assert.strictEqual(extracted.length, 2);
+  assert.deepStrictEqual(extracted[0], {
+    Produk: "100 Diamonds",
+    Harga: "Rp 17.760",
+  });
+  assert.deepStrictEqual(extracted[1], {
+    Produk: "310 Diamonds",
+    Harga: "Rp 54.390",
+  });
+}
+
 testKnownSiteCardParsers();
 testInvalidUnknownSite();
 testValidKnownSite();
@@ -213,4 +236,5 @@ testNumericNoiseRejected();
 testMobapayMobileLegendsRows();
 testWrongGameProductsRejected();
 testValidUnknownSite();
+testExtractProductPairsFromJson();
 console.log("Validation tests passed.");

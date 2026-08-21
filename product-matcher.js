@@ -176,19 +176,34 @@ function findMatches(mainProduct, competitorProducts) {
     return [];
   }
 
-  const maxDifference = Math.min(
-    5,
-    Math.max(1, Math.ceil(mainProduct.quantity * 0.1)),
-  );
+  // ============================================================================
+  // RUMUS TOLERANSI KEDEKATAN NOMINAL (PROXIMITY MATCHING)
+  // ============================================================================
+  // Langkah 1: Hitung 10% dari jumlah Diamond toko utama dan bulatkan ke atas
+  let maxDifference = Math.ceil(mainProduct.quantity * 0.1);
 
+  // Langkah 2: Batas minimal toleransi adalah 1 Diamond (tidak boleh 0)
+  if (maxDifference < 1) {
+    maxDifference = 1;
+  }
+
+  // Langkah 3: Batas maksimal toleransi dikunci di 5 Diamond (agar paket besar tidak salah pasang)
+  if (maxDifference > 5) {
+    maxDifference = 5;
+  }
+
+  // Langkah 4: Cari produk kompetitor yang selisihnya masih di dalam batas toleransi
   return Array.from(competitorProducts.values())
-    .filter(
-      (candidate) =>
-        candidate.category === "diamond" &&
-        candidate.quantity !== null &&
-        Math.abs(candidate.quantity - mainProduct.quantity) <= maxDifference,
-    )
+    .filter((candidate) => {
+      if (candidate.category !== "diamond" || candidate.quantity === null) {
+        return false;
+      }
+      // Hitung selisih mutlak antara jumlah diamond toko kompetitor dan toko utama
+      const difference = Math.abs(candidate.quantity - mainProduct.quantity);
+      return difference <= maxDifference;
+    })
     .sort((first, second) => {
+      // Urutkan dari yang selisihnya paling kecil (paling dekat / nearest neighbor)
       const firstDistance = Math.abs(first.quantity - mainProduct.quantity);
       const secondDistance = Math.abs(second.quantity - mainProduct.quantity);
       return firstDistance - secondDistance || first.pricePerUnit - second.pricePerUnit;

@@ -153,10 +153,10 @@ async function testGoogleRankingSelection() {
       link: "https://store-b.example/games/roblox",
     },
   ];
-  const selected = selectGoogleCompetitors(organicResults, game, 2);
+  const selected = selectGoogleCompetitors(organicResults, game, 3);
   assert.deepStrictEqual(
-    selected.ranking.map((result) => result.position),
-    [2, 4],
+    selected.ranking.map((result) => result.store),
+    ["itemku.com", "store-a.example", "store-b.example"],
   );
 
   let requestedUrl;

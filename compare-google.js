@@ -136,6 +136,24 @@ function selectGoogleCompetitors(results, gameConfig, limit) {
   const seenStores = new Set();
   const ranking = [];
 
+  // 1. Masukkan priority stores (seperti itemku.com) di urutan pertama
+  if (Array.isArray(gameConfig.priorityStores)) {
+    for (const priority of gameConfig.priorityStores) {
+      const store = normalizeHostname(priority.url);
+      if (!seenStores.has(store)) {
+        seenStores.add(store);
+        ranking.push({
+          position: ranking.length + 1,
+          title: priority.name || store,
+          link: priority.url,
+          store,
+          isPriority: true,
+        });
+      }
+    }
+  }
+
+  // 2. Masukkan hasil ranking organik Google berikutnya hingga batas limit
   for (const result of decisions) {
     if (!result.eligible) continue;
     const store = normalizeHostname(result.link);
@@ -779,10 +797,15 @@ async function main() {
   }
   const selectedGames = gameId === "all"
     ? GAME_CONFIGS
-    : GAME_CONFIGS.filter((game) => game.id === gameId);
+    : GAME_CONFIGS.filter((game) =>
+        gameId
+          .split(",")
+          .map((id) => id.trim().toLowerCase())
+          .includes(game.id),
+      );
   if (!selectedGames.length) {
     throw new Error(
-      `Game tidak valid: ${gameId}. Pilih all, mobile-legends, free-fire, atau roblox.`,
+      `Game tidak valid: ${gameId}. Pilih all, mobile-legends, free-fire, roblox, atau kombinasi koma (contoh: free-fire,roblox).`,
     );
   }
 
