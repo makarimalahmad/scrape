@@ -801,6 +801,93 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
     .catch(() => false);
 }
 
+async function scrapeWithPuppeteerRealBrowser(url, headed = false) {
+  let connect;
+  try {
+    const realBrowserPkg = require("puppeteer-real-browser");
+    connect = realBrowserPkg.connect;
+  } catch {
+    return null;
+  }
+  if (!connect) return null;
+
+  console.log(
+    `[RealBrowser Fallback] Mencoba membuka Chrome asli untuk bypass proteksi ketat: ${url.hostname}...`,
+  );
+  let session = null;
+  try {
+    session = await connect({
+      headless: !headed,
+      turnstile: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const { browser, page } = session;
+
+    await page.goto(url.href, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+
+    // Tunggu produk muncul di DOM
+    await page
+      .waitForFunction(
+        () => {
+          const text = document.body?.innerText || "";
+          return (
+            /(?:Rp\.?|IDR|USD|RM)\s*\d/i.test(text) &&
+            /(?:diamond|robux|pass|member|voucher|point|token)/i.test(text)
+          );
+        },
+        { timeout: 30000 },
+      )
+      .catch(() => {});
+
+    const rows = await page.evaluate(() => {
+      const cards = Array.from(
+        document.querySelectorAll(
+          '[class*="group/variant"], .sku-card, [class*="product-card"], .form-check-label-rounded-lg, .denom, [class*="recharge-item"]',
+        ),
+      );
+      const items = [];
+      const priceRegex = /(?:Rp\.?|IDR|USD|RM)\s*[\d.]+/gi;
+
+      for (const card of cards) {
+        const text = card.innerText?.replace(/\s+/g, " ").trim() || "";
+        const prices = text.match(priceRegex);
+        if (!prices || !prices.length) continue;
+        const price = prices[0];
+        const name = text
+          .replace(price, "")
+          .replace(
+            /\b(?:dari|best seller|promo|diskon|\d+\s*\/\s*\d+\s*purchased|disc\s*\d+%)\b/gi,
+            "",
+          )
+          .replace(/\s+/g, " ")
+          .trim();
+        if (name && price) {
+          items.push({ Produk: name, Harga: price });
+        }
+      }
+      return items;
+    });
+
+    if (rows && rows.length > 0) {
+      console.log(
+        `[RealBrowser Fallback] Berhasil mengambil ${rows.length} data produk via Real Browser!`,
+      );
+      return rows;
+    }
+    return null;
+  } catch (err) {
+    console.log(`[RealBrowser Fallback] Gagal mengambil data: ${err.message}`);
+    return null;
+  } finally {
+    if (session?.browser) {
+      await session.browser.close().catch(() => {});
+    }
+  }
+}
+
 async function scrape(url, selector, headed, options = {}) {
   const ownsBrowser = !options.browser;
   const browser = options.browser || await chromium.launch({ headless: !headed });
@@ -1317,6 +1404,21 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       ...row,
       Sumber: url.href,
     }));
+  } catch (error) {
+    if (!options.isFallbackAttempt) {
+      console.log(
+        `[Playwright Notice] Scraper standar menemui kendala: ${error.message}. Mencoba fallback ke Real Browser...`,
+      );
+      const fallbackRows = await scrapeWithPuppeteerRealBrowser(url, headed);
+      if (fallbackRows && fallbackRows.length > 0) {
+        return fallbackRows.map((row, index) => ({
+          No: index + 1,
+          ...row,
+          Sumber: url.href,
+        }));
+      }
+    }
+    throw error;
   } finally {
     if (context) await context.close().catch(() => {});
     if (ownsBrowser) await browser.close().catch(() => {});
