@@ -630,6 +630,53 @@ async function extractUnipinRobloxRows(page) {
   return rows;
 }
 
+async function extractBangjeffRows(page) {
+  return await page
+    .evaluate(async () => {
+      const el = document.querySelector("#__NEXT_DATA__");
+      if (!el) return null;
+      let nextData;
+      try {
+        nextData = JSON.parse(el.innerText);
+      } catch {
+        return null;
+      }
+
+      const productId = nextData.props?.pageProps?.product?.id;
+      if (!productId) return null;
+
+      try {
+        const res = await fetch(
+          `https://api.bangjeff.com/v3/product-variant/${productId}?region=ID`,
+          {
+            headers: { Accept: "application/json" },
+          },
+        );
+        const json = await res.json();
+        const groups = json?.data || [];
+        const items = [];
+
+        for (const group of groups) {
+          const variants = group.variants || [];
+          for (const variant of variants) {
+            const name = variant.name?.trim();
+            const priceNum = variant.price || variant.originalPrice;
+            if (name && priceNum) {
+              items.push({
+                Produk: name,
+                Harga: `Rp ${priceNum.toLocaleString("id-ID")}`,
+              });
+            }
+          }
+        }
+        return items;
+      } catch {
+        return null;
+      }
+    })
+    .catch(() => null);
+}
+
 async function extractSpecialRows(page, url, interceptedPayloads = []) {
   const hostname = url.hostname.replace(/^www\./, "");
   if (hostname === "upoint.id") return extractUPointRows(page);
@@ -640,6 +687,7 @@ async function extractSpecialRows(page, url, interceptedPayloads = []) {
   if (hostname === "tokopedia.com") return extractTokopediaRows(page);
   if (hostname === "blibli.com") return extractBlibliRows(page, interceptedPayloads);
   if (hostname === "vcgamers.com") return extractVcgamersRows(page);
+  if (hostname === "bangjeff.com") return extractBangjeffRows(page);
   if (hostname === "roblox.com") return extractRobloxRows(page);
   if (hostname === "kiosgamer.co.id") return extractKiosgamerRows(page);
   if (hostname === "gopay.co.id") return extractGopayRows(page);
@@ -865,7 +913,7 @@ async function scrape(url, selector, headed, options = {}) {
       await waitForProductData(page, 10_000, url.hostname);
     }
 
-    if (/ourastore\.com$|bangjeff\.com$/i.test(url.hostname)) {
+    if (/ourastore\.com$/i.test(url.hostname)) {
       const waitForProductCards = () =>
         page
           .waitForFunction(
@@ -893,7 +941,7 @@ async function scrape(url, selector, headed, options = {}) {
           "API produk situs tidak selesai dimuat dalam 15 detik (terhalang firewall Cloudflare di VPS).",
         );
       }
-    } else {
+    } else if (!url.hostname.endsWith("bangjeff.com")) {
       await waitForProductData(page, 20_000, url.hostname);
     }
 
