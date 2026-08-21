@@ -811,6 +811,16 @@ async function scrapeWithPuppeteerRealBrowser(url, headed = false) {
   }
   if (!connect) return null;
 
+  if (!process.env.CHROME_PATH) {
+    try {
+      const standardPlaywright = require("playwright");
+      const execPath = standardPlaywright.chromium.executablePath();
+      if (execPath && fs.existsSync(execPath)) {
+        process.env.CHROME_PATH = execPath;
+      }
+    } catch {}
+  }
+
   console.log(
     `[RealBrowser Fallback] Mencoba membuka Chrome asli untuk bypass proteksi ketat: ${url.hostname}...`,
   );
@@ -819,7 +829,7 @@ async function scrapeWithPuppeteerRealBrowser(url, headed = false) {
     session = await connect({
       headless: !headed,
       turnstile: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
     });
     const { browser, page } = session;
 
