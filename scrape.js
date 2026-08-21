@@ -747,44 +747,50 @@ async function solveCloudflareChallenge(
   { timeout = 120_000, maxClicks = Number.POSITIVE_INFINITY } = {},
 ) {
   const deadline = Date.now() + timeout;
-  let clearSince = null;
   let clickCount = 0;
   let lastClickAt = 0;
 
   while (Date.now() < deadline) {
-    if (!(await pageShowsCloudflareChallenge(page))) {
-      clearSince ??= Date.now();
-      if (Date.now() - clearSince >= 1_500) {
-        return { passed: true, clickCount };
-      }
-      await page.waitForTimeout(100);
-      continue;
+    const isChallenge = await pageShowsCloudflareChallenge(page);
+    const bodyText = await page.locator("body").innerText().catch(() => "");
+    const hasProducts =
+      /(?:Rp\.?|IDR)\s*\d/i.test(bodyText) &&
+      /(?:diamond|robux|member|pass|voucher|token|point)/i.test(bodyText);
+
+    if (!isChallenge && hasProducts) {
+      return { passed: true, clickCount };
     }
 
-    clearSince = null;
     if (clickCount >= maxClicks) {
       return { passed: false, clickCount, clickLimitReached: true };
     }
 
-    const waitBeforeNextClick = 1_750 - (Date.now() - lastClickAt);
-    if (waitBeforeNextClick > 0) {
-      await page.waitForTimeout(Math.min(waitBeforeNextClick, 250));
-      continue;
-    }
-
     const frame = await findTurnstileFrame(
       page,
-      Math.min(1_000, Math.max(100, deadline - Date.now())),
+      Math.min(2_000, Math.max(100, deadline - Date.now())),
     );
-    if (!frame) continue;
 
-    if (await clickTurnstileFrame(page, frame)) {
-      clickCount += 1;
-      lastClickAt = Date.now();
-      console.log(`Klik checkbox Cloudflare (${clickCount})...`);
-    } else {
-      await page.waitForTimeout(100);
+    if (frame) {
+      const waitBeforeNextClick = 2_000 - (Date.now() - lastClickAt);
+      if (waitBeforeNextClick > 0) {
+        await page.waitForTimeout(Math.min(waitBeforeNextClick, 500));
+        continue;
+      }
+
+      if (await clickTurnstileFrame(page, frame)) {
+        clickCount += 1;
+        lastClickAt = Date.now();
+        console.log(`Klik checkbox Cloudflare (${clickCount})...`);
+        await page.waitForTimeout(2_500);
+        continue;
+      }
     }
+
+    if (!isChallenge && !frame && Date.now() - lastClickAt > 4_000) {
+      return { passed: true, clickCount };
+    }
+
+    await page.waitForTimeout(400);
   }
 
   return { passed: false, clickCount };
