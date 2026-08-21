@@ -862,10 +862,10 @@ async function scrape(url, selector, headed, options = {}) {
       console.log(
         `Cloudflare lolos setelah ${challenge.clickCount} klik. Menunggu produk dimuat...`,
       );
-      await waitForProductData(page, 10_000, url.hostname);
+      await waitForProductData(page, 30_000, url.hostname);
     }
 
-    if (/ourastore\.com$/i.test(url.hostname)) {
+    if (/ourastore\.com$|bangjeff\.com$/i.test(url.hostname)) {
       const waitForProductCards = () =>
         page
           .waitForFunction(
@@ -882,7 +882,7 @@ async function scrape(url, selector, headed, options = {}) {
               });
             },
             null,
-            { timeout: 15_000 },
+            { timeout: 120_000 },
           )
           .then(() => true)
           .catch(() => false);
@@ -890,7 +890,7 @@ async function scrape(url, selector, headed, options = {}) {
       const productsReady = await waitForProductCards();
       if (!productsReady) {
         throw new Error(
-          "API produk situs tidak selesai dimuat dalam 15 detik.",
+          "API produk situs tidak selesai dimuat dalam 120 detik. Jangan reload karena dapat memicu Cloudflare lagi; coba jalankan ulang atau ganti jaringan.",
         );
       }
     } else {
