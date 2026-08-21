@@ -661,9 +661,9 @@ async function createOptimizedContext(browser) {
 }
 
 const CLOUDFLARE_CHALLENGE_PATTERN =
-  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
+  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda|tunggu sebentar|just a moment|verifying you are human/i;
 
-async function findTurnstileFrame(page, timeout = 1_000) {
+async function findTurnstileFrame(page, timeout = 2_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const frame = page
@@ -678,6 +678,12 @@ async function findTurnstileFrame(page, timeout = 1_000) {
 }
 
 async function pageShowsCloudflareChallenge(page) {
+  const hasTurnstileFrame = page
+    .frames()
+    .some((candidate) =>
+      candidate.url().includes("challenges.cloudflare.com"),
+    );
+  if (hasTurnstileFrame) return true;
   const title = await page.title().catch(() => "");
   const bodyText = await page.locator("body").innerText().catch(() => "");
   return CLOUDFLARE_CHALLENGE_PATTERN.test(`${title}\n${bodyText}`);
