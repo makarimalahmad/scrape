@@ -683,34 +683,56 @@ async function pageShowsCloudflareChallenge(page) {
   return CLOUDFLARE_CHALLENGE_PATTERN.test(`${title}\n${bodyText}`);
 }
 
-async function clickTurnstileFrame(page, frame) {
-  const targets = [
-    frame.locator('input[type="checkbox"]'),
-    frame.locator('[role="checkbox"]'),
-    frame.locator(".ctp-checkbox-label"),
-    frame.locator("label").filter({ hasText: /verifikasi|verify|human/i }),
-  ];
+function generateBezierPoints(startX, startY, endX, endY, steps = 20) {
+  const midX = (startX + endX) / 2 + (Math.random() - 0.5) * 80;
+  const midY = (startY + endY) / 2 + (Math.random() - 0.5) * 80;
+  const points = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const x = Math.round(
+      (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * midX + t * t * endX,
+    );
+    const y = Math.round(
+      (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * midY + t * t * endY,
+    );
+    points.push({ x, y });
+  }
+  return points;
+}
 
-  for (const target of targets) {
-    const visible = await target.first().isVisible().catch(() => false);
-    if (!visible) continue;
-    const clicked = await target
-      .first()
-      .click({ delay: 75 + Math.random() * 75, timeout: 1_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (clicked) return true;
+async function humanMoveAndClick(page, targetX, targetY) {
+  const startX = Math.round(100 + Math.random() * 300);
+  const startY = Math.round(100 + Math.random() * 300);
+  const steps = 18 + Math.floor(Math.random() * 10);
+  const points = generateBezierPoints(startX, startY, targetX, targetY, steps);
+
+  for (const point of points) {
+    await page.mouse.move(point.x, point.y);
+    await page.waitForTimeout(8 + Math.random() * 12);
   }
 
+  // Hover sebentar di atas target (seperti refleks manusia)
+  await page.waitForTimeout(150 + Math.random() * 200);
+
+  // Klik alami: tekan -> jeda tahan -> lepas
+  await page.mouse.down();
+  await page.waitForTimeout(60 + Math.random() * 80);
+  await page.mouse.up();
+}
+
+async function clickTurnstileFrame(page, frame) {
   const frameElement = await frame.frameElement().catch(() => null);
   const box = await frameElement?.boundingBox().catch(() => null);
   if (!box) return false;
 
-  await page.mouse.click(
-    box.x + Math.min(28, box.width / 2),
-    box.y + box.height / 2,
-    { delay: 75 + Math.random() * 75 },
+  const targetX = Math.round(
+    box.x + Math.min(28, box.width / 2) + (Math.random() - 0.5) * 6,
   );
+  const targetY = Math.round(
+    box.y + box.height / 2 + (Math.random() - 0.5) * 6,
+  );
+
+  await humanMoveAndClick(page, targetX, targetY);
   return true;
 }
 
