@@ -746,9 +746,10 @@ async function solveCloudflareChallenge(
   page,
   { timeout = 120_000, maxClicks = Number.POSITIVE_INFINITY } = {},
 ) {
-  const deadline = Date.now() + timeout;
+  const startedAt = Date.now();
+  const deadline = startedAt + timeout;
   let clickCount = 0;
-  let lastClickAt = 0;
+  let lastClickAt = startedAt;
 
   while (Date.now() < deadline) {
     const isChallenge = await pageShowsCloudflareChallenge(page);
@@ -786,7 +787,12 @@ async function solveCloudflareChallenge(
       }
     }
 
-    if (!isChallenge && !frame && Date.now() - lastClickAt > 4_000) {
+    if (
+      !isChallenge &&
+      !frame &&
+      Date.now() - lastClickAt >= 5_000 &&
+      Date.now() - startedAt >= 6_000
+    ) {
       return { passed: true, clickCount };
     }
 
