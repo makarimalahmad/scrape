@@ -21,5 +21,6 @@ other/
 debug-ff-new.js
 *.bak
 .DS_Store
-Thumbs.db
 summary-scrape.json
+AGENTS.md
+agents.md
