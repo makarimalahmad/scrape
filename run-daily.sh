@@ -5,8 +5,9 @@ umask 077
 
 export PATH="/usr/local/bin:/usr/bin:/bin"
 
-APP_DIR="/home/ubuntu/price-scraper"
-ENV_FILE="/home/ubuntu/.config/price-scraper/env"
+USER_HOME="${HOME:-/home/$(whoami)}"
+APP_DIR="${PRICE_SCRAPER_DIR:-$USER_HOME/price-scraper}"
+ENV_FILE="${PRICE_SCRAPER_ENV:-$USER_HOME/.config/price-scraper/env}"
 ATTEMPTS="${SCRAPE_ATTEMPTS:-5}"
 
 cd "$APP_DIR" || exit 1
