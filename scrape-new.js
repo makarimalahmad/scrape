@@ -105,21 +105,23 @@ function calculateComparison(mainProduct, benchmark) {
 
 function createScrapeRows(gameConfig, ranking, mainStores, competitors) {
   const anchors = createProductAnchors(mainStores);
-  const competitorByPosition = new Map(
-    competitors.map((store) => [store.position, store]),
+  const competitorByName = new Map(
+    competitors.map((store) => [store.name || store.store, store]),
   );
   const competitorMatches = new Map();
 
   for (const store of competitors) {
-    competitorMatches.set(store.position, matchStoreToAnchors(anchors, store).matches);
+    const storeKey = store.name || store.store;
+    competitorMatches.set(storeKey, matchStoreToAnchors(anchors, store).matches);
   }
 
   const rows = [];
   for (const anchor of anchors) {
     const entries = [];
     for (const rankedStore of ranking) {
-      const store = competitorByPosition.get(rankedStore.position);
-      const product = competitorMatches.get(rankedStore.position)?.get(anchor.id);
+      const storeKey = rankedStore.store || rankedStore.title;
+      const store = competitorByName.get(storeKey);
+      const product = competitorMatches.get(storeKey)?.get(anchor.id);
       if (store && product) entries.push({ store, product });
     }
     if (!entries.length) continue;
@@ -137,7 +139,8 @@ function createScrapeRows(gameConfig, ranking, mainStores, competitors) {
     };
 
     for (const rankedStore of ranking) {
-      const product = competitorMatches.get(rankedStore.position)?.get(anchor.id);
+      const storeKey = rankedStore.store || rankedStore.title;
+      const product = competitorMatches.get(storeKey)?.get(anchor.id);
       row[rankedStore.store] = product?.price ?? "-";
     }
 
