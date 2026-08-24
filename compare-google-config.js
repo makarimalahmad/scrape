@@ -58,7 +58,10 @@ const GAME_CONFIGS = [
     priorityStores: [
       {
         name: "itemku.com",
-        url: "https://itemku.com/id/g/roblox/robux-5-hari",
+        urls: [
+          "https://www.itemku.com/id/g/roblox/robux-game-card",
+          "https://www.itemku.com/id/g/roblox/rbl-credits-gift-card",
+        ],
       },
     ],
   },

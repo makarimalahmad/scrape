@@ -53,6 +53,19 @@ function parseRobloxProduct(name) {
     };
   }
 
+  const kMatch =
+    name.match(/(?:roblox|rbl)?(?:\s*credits|\s*gift\s*card)?\s*(?:idr\s*)?(?:rp\.?)?\s*(\d[\d.,]*)\s*k\b/i) ||
+    name.match(/idr\s*rp\s*(\d[\d.,]*)\s*k/i);
+  if (kMatch) {
+    const quantity = parseCount(kMatch[1]) * 1_000;
+    return {
+      key: `Roblox IDR ${quantity}`,
+      category: "roblox-idr-card",
+      quantity,
+      unit: "IDR Voucher",
+    };
+  }
+
   const idrMatch =
     name.match(/roblox(?:\s+gift\s+card)?\s*idr\s*(\d[\d.,]*)/i) ||
     name.match(/(?:roblox\s*)?idr\s*(\d[\d.,]*)/i) ||

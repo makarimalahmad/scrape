@@ -139,13 +139,15 @@ function selectGoogleCompetitors(results, gameConfig, limit) {
   // 1. Masukkan priority stores (seperti itemku.com) di urutan pertama
   if (Array.isArray(gameConfig.priorityStores)) {
     for (const priority of gameConfig.priorityStores) {
-      const store = normalizeHostname(priority.url);
+      const primaryUrl = Array.isArray(priority.urls) ? priority.urls[0] : priority.url;
+      const store = normalizeHostname(primaryUrl);
       if (!seenStores.has(store)) {
         seenStores.add(store);
         ranking.push({
           position: ranking.length + 1,
           title: priority.name || store,
-          link: priority.url,
+          link: primaryUrl,
+          urls: Array.isArray(priority.urls) ? priority.urls : [priority.url].filter(Boolean),
           store,
           isPriority: true,
         });
@@ -307,45 +309,59 @@ function normalizeStoreUrl(value, gameConfig) {
 }
 
 async function scrapeStore(store, gameConfig, options) {
-  const url = normalizeStoreUrl(store.url || store.link, gameConfig);
+  const targetUrls = Array.isArray(store.urls) && store.urls.length > 0
+    ? store.urls
+    : [store.url || store.link].filter(Boolean);
+
   console.log(`Scrape ${gameConfig.name}: ${store.name || store.store}`);
-  let validation;
-  const rows = await scrapeWithRetry(
-    url,
-    options.headed,
-    options.maxAttempts,
-    async (...args) => {
-      const extractedRows = await scrape(...args);
-      validation = validateScrapeResults(url.href, extractedRows, gameConfig.id);
-      if (!validation.valid) {
-        const error = new Error(
-          `${validation.status}, confidence ${validation.confidence}: ${validation.reasons.join(", ")}`,
-        );
-        error.retryable =
-          validation.stats.totalRows < 2 ||
-          validation.stats.validPriceRatio < 0.8 ||
-          validation.stats.relevantProductRatio < 0.5;
-        throw error;
-      }
-      return extractedRows;
-    },
-    undefined,
-    { browser: options.browser },
-  );
+  const allRows = [];
+  let lowestConfidence = 100;
+  const primaryUrl = normalizeStoreUrl(targetUrls[0], gameConfig);
+
+  for (const rawUrl of targetUrls) {
+    const url = normalizeStoreUrl(rawUrl, gameConfig);
+    let validation;
+    const rows = await scrapeWithRetry(
+      url,
+      options.headed,
+      options.maxAttempts,
+      async (...args) => {
+        const extractedRows = await scrape(...args);
+        validation = validateScrapeResults(url.href, extractedRows, gameConfig.id);
+        if (!validation.valid) {
+          const error = new Error(
+            `${validation.status}, confidence ${validation.confidence}: ${validation.reasons.join(", ")}`,
+          );
+          error.retryable =
+            validation.stats.totalRows < 2 ||
+            validation.stats.validPriceRatio < 0.8 ||
+            validation.stats.relevantProductRatio < 0.5;
+          throw error;
+        }
+        return extractedRows;
+      },
+      undefined,
+      { browser: options.browser },
+    );
+    allRows.push(...rows);
+    if (validation && typeof validation.confidence === "number") {
+      lowestConfidence = Math.min(lowestConfidence, validation.confidence);
+    }
+  }
 
   const scrapeFilePath = exportScrapeFile(
-    rows,
+    allRows,
     store,
     options.scrapeOutputDirectory,
   );
   return {
     name: store.name || store.store,
-    url: url.href,
+    url: primaryUrl.href,
     position: store.position ?? "Utama",
-    confidence: validation.confidence,
-    rawProductCount: rows.length,
+    confidence: lowestConfidence,
+    rawProductCount: allRows.length,
     scrapeFilePath,
-    products: selectCheapestProducts(rows, gameConfig.id),
+    products: selectCheapestProducts(allRows, gameConfig.id),
   };
 }
 
