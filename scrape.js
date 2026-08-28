@@ -269,7 +269,7 @@ function parseBlibliOptionText(text) {
   return { Produk: product, Harga: price[0] };
 }
 
-async function extractBlibliRows(page, interceptedPayloads = []) {
+async function extractBlibliRows(page, interceptedPayloads = [], url = null) {
   const blibliApi = interceptedPayloads.find((r) =>
     r.url.includes("/backend/digital-product/products"),
   );
@@ -277,6 +277,50 @@ async function extractBlibliRows(page, interceptedPayloads = []) {
     const apiRows = extractProductPairsFromJson(blibliApi.data);
     if (apiRows.length) return apiRows;
   }
+
+  const directApiRows = await page
+    .evaluate(async (currentUrl) => {
+      try {
+        const u = new URL(currentUrl);
+        const slug = u.pathname.split("/").filter(Boolean).pop() || "";
+        const opMap = {
+          "free-fire": "Free_Fire",
+          "mobile-legends": "Mobile_Legend",
+          "roblox": "Roblox",
+          "pubg-mobile": "PUBG_Mobile",
+          "genshin-impact": "Ghensin_Impact",
+          "valorant": "Valorant",
+        };
+        const opName =
+          opMap[slug.toLowerCase()] ||
+          slug
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join("_");
+        const res = await fetch(
+          `https://www.blibli.com/backend/digital-product/products?productType=GAME_VOUCHER&operatorName=${opName}`,
+          { headers: { Accept: "application/json" } },
+        );
+        const json = await res.json();
+        const products = json?.data?.products || [];
+        return products
+          .map((p) => {
+            const name = p.name || p.internalName;
+            const price = p.price || p.nominal || p.offerPrice;
+            if (!name || !price) return null;
+            return {
+              Produk: name.trim(),
+              Harga: `Rp ${Number(price).toLocaleString("id-ID")}`,
+            };
+          })
+          .filter(Boolean);
+      } catch {
+        return [];
+      }
+    }, url?.href || page.url())
+    .catch(() => []);
+
+  if (directApiRows.length) return directApiRows;
 
   const ready = await page
     .waitForFunction(
@@ -639,7 +683,7 @@ async function extractSpecialRows(page, url, interceptedPayloads = []) {
     return extractUniPinRows(page);
   }
   if (hostname === "tokopedia.com") return extractTokopediaRows(page);
-  if (hostname === "blibli.com") return extractBlibliRows(page, interceptedPayloads);
+  if (hostname === "blibli.com") return extractBlibliRows(page, interceptedPayloads, url);
   if (hostname === "vcgamers.com") return extractVcgamersRows(page);
   if (hostname === "roblox.com") return extractRobloxRows(page);
   if (hostname === "kiosgamer.co.id") return extractKiosgamerRows(page);
