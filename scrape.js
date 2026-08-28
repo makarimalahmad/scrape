@@ -992,8 +992,13 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
   const recommendationNoise =
     /(?:arena of valor|call of duty|free fire max|speed drifters|\bundawn\b)/i;
 
+  const isGiftCardOrRoblox =
+    pathname.includes("roblox") ||
+    pathname.includes("gift-card") ||
+    /roblox|gift[_-]?cards?/i.test(pathname);
+
   const isTaxExcluded =
-    hostname.endsWith("codashop.com") ||
+    (hostname.endsWith("codashop.com") && !isGiftCardOrRoblox) ||
     /pajak akan dikenakan|belum termasuk (?:pajak|ppn)|sebelum pajak|excl(?:ude)?\.?\s*tax/i.test(
       document.body?.innerText || "",
     );
