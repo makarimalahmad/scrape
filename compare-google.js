@@ -305,7 +305,12 @@ async function scrapeWithRetry(
 }
 
 function normalizeStoreUrl(value, gameConfig) {
-  return normalizeTokopediaUrl(value, gameConfig.id);
+  const url = normalizeTokopediaUrl(value, gameConfig?.id);
+  const hostname = url.hostname.replace(/^www\./, "").toLowerCase();
+  if (hostname === "golrox.com" && url.pathname.startsWith("/beli-robux") && !url.pathname.includes("/instant")) {
+    return new URL("https://golrox.com/beli-robux/instant");
+  }
+  return url;
 }
 
 async function scrapeStore(store, gameConfig, options) {

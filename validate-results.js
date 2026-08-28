@@ -26,7 +26,7 @@ const PRODUCT_PATTERN =
 const NUMERIC_PACKAGE_PATTERN = /^\d[\d.,]*(?:\s*\+\s*\d[\d.,]*)?$/;
 
 const NOISE_PATTERN =
-  /^(?:subtotal|total harga|kamu hemat|tabungan|\d+%\s*off|berlaku untuk pesanan|instan|menit kirim|waktu kirim|ulasan|rating|terjual|stok|biaya|pajak|discount|diskon|copyright|all rights reserved|pilih denom)/i;
+  /^(?:subtotal|total harga|kamu hemat|tabungan|\d+%\s*off|berlaku untuk pesanan|instan|menit kirim|waktu kirim|ulasan|rating|terjual|stok|biaya|pajak|discount|diskon|copyright|all rights reserved|pilih denom|dana|gopay|ovo|linkaja|shopeepay|astrapay|qris|iqiyi|wetv|vidio|viu|netflix|spotify)/i;
 
 const PRICE_PATTERN =
   /^(?:(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*)?\d[\d.,]*$/i;
@@ -56,6 +56,7 @@ function isRelevantProduct(value) {
 function isProductRelevantForGame(value, game) {
   const product = String(value || "").replace(/\s+/g, " ").trim();
   if (!game) return isRelevantProduct(product);
+  if (/^(?:[5-9]|\d{2,})[\d.,]*(?:\s*\+\s*\d[\d.,]*)?$/.test(product)) return true;
   if (game === "roblox") return /robux|roblox|gift\s*card|\bidr\b|\busd\b/i.test(product);
   return /diamond|\bdm\b|pass|pack|bundle|membership|member|starlight|twilight|weekly|monthly/i.test(
     product,

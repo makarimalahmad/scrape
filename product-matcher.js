@@ -95,6 +95,19 @@ function parseRobloxProduct(name) {
     };
   }
 
+  const bareNumberMatch = name.match(/^(\d[\d.,]*)$/);
+  if (bareNumberMatch) {
+    const quantity = parseCount(bareNumberMatch[1]);
+    if (quantity > 0) {
+      return {
+        key: `${quantity} Robux`,
+        category: "robux",
+        quantity,
+        unit: "Robux",
+      };
+    }
+  }
+
   return null;
 }
 
@@ -108,12 +121,14 @@ function parseDiamondProduct(name) {
   const diamondMatch = name.match(
     /(\d[\d.,]*)\s*(?:(?:free\s*fire|ff)\s*)?(?:diamonds?|diaomonds?|dm|berlian)/i,
   );
+  const bareNumberMatch = name.match(/^(\d[\d.,]*)$/);
 
   let quantity = null;
   if (leadingTotalMatch) quantity = parseCount(leadingTotalMatch[1]);
   else if (bonusMatch) {
     quantity = parseCount(bonusMatch[1]) + parseCount(bonusMatch[2]);
   } else if (diamondMatch) quantity = parseCount(diamondMatch[1]);
+  else if (bareNumberMatch) quantity = parseCount(bareNumberMatch[1]);
 
   if (quantity === null) return null;
 

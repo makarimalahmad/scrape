@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline/promises");
 const { validateScrapeResults } = require("./validate-results");
+const { extractWithGroq } = require("./ai-extractor");
 
 const DEFAULT_SELECTOR =
   '.denom, article, li, label, button, [role="radio"], [class*="product"], [class*="item"], [class*="card"], [class*="denom"]';
@@ -959,6 +960,10 @@ async function scrape(url, selector, headed, options = {}) {
       }
     }
 
+    await page.locator(".animate-shimmer, [class*='skeleton']").first().waitFor({ state: "detached", timeout: 8_000 }).catch(() => {});
+    await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+    await page.waitForTimeout(500);
+
     await page.evaluate(async () => {
       let previousHeight = 0;
       for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -970,7 +975,7 @@ async function scrape(url, selector, headed, options = {}) {
       }
       window.scrollTo(0, 0);
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
 function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
   const priceRegex =
@@ -1029,6 +1034,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
   const isDana = hostname.endsWith("dana.id");
   const isLootbar = hostname.endsWith("lootbar.com");
   const isGogogo = hostname.endsWith("gogogo.id");
+  const isUnipin = hostname.endsWith("unipin.com");
   const productSelector = hostname.endsWith("upoint.id")
     ? ".cursor-pointer"
     : isDuniaGamesRoblox
@@ -1041,7 +1047,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
             ? "li.topup-list-con-item"
             : isGogogo
               ? '[data-testid^="qa-product-item-card-container-"]'
-              : '.pDRoot, .mobapay-recharge-item, [class*="recharge-item"], [class*="product-card"], .form-check-label-rounded-lg, [class*="group/variant"], .sku-card, .highlighted-sku-card, .denom-container > button';
+              : '.pDRoot, .mobapay-recharge-item, [class*="recharge-item"], [class*="product-card"], .form-check-label-rounded-lg, [class*="group/variant"], .sku-card, .highlighted-sku-card, .denom-container > button, .main-info, div[class*="cursor-pointer"]';
   let productCards = [];
   try {
     productCards = Array.from(document.querySelectorAll(productSelector));
@@ -1077,6 +1083,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     const isGogogoCard =
       isGogogo &&
       card.matches('[data-testid^="qa-product-item-card-container-"]');
+    const isUnipinCard = isUnipin && card.matches("button.position-relative, div.form-check-label-rounded-lg, .denom-container button, button, div");
     const upointParts = isUpointCard ? text.split(/\bfrom\b/i) : [];
     const upointPrice = isUpointCard
       ? upointParts.slice(1).join(" ").match(priceRegex)?.[0]
@@ -1115,9 +1122,19 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
         )?.innerText,
       )
       : null;
+    const unipinName = isUnipinCard
+      ? clean(card.querySelector(".fsemibold, .title, .denomination-name")?.innerText || text.split("\n")[0])
+      : "";
+    const unipinPrice = isUnipinCard
+      ? clean(card.querySelector(".price, .text-right, span.text-primary, [class*='text-white']:last-child")?.innerText || prices[prices.length - 1])
+      : null;
+    const discEl = card.querySelector('.discounted-price, [class*="discounted-price"], .discount-price, [class*="discount-price"]');
+    const discPriceRaw = clean(discEl?.innerText);
+    const genericDiscountedPrice = discPriceRaw ? (/(?:Rp|IDR|\$)/i.test(discPriceRaw) ? discPriceRaw : `Rp ${discPriceRaw}`) : null;
+
     const effectivePrice = isMobapayCard || isDuniaGamesCard
       ? prices[prices.length - 1]
-      : gogogoPrice || lootbarPrice || danaPrice || itemkuPrice || robloxTransactionPrice || upointPrice || prices[0];
+      : unipinPrice || genericDiscountedPrice || gogogoPrice || lootbarPrice || danaPrice || itemkuPrice || robloxTransactionPrice || upointPrice || prices[0];
     let name = isUpointCard
       ? upointParts[0].trim()
       : isDuniaGamesCard
@@ -1128,7 +1145,9 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
             ? lootbarName
             : isGogogoCard
               ? gogogoName
-              : isItemkuCard && itemkuPrice
+              : isUnipinCard && unipinName
+                ? unipinName
+                : isItemkuCard && itemkuPrice
             ? text.slice(0, text.lastIndexOf(itemkuPrice)).trim()
             : isRobloxStoreCard && robloxTransactionPrice
               ? text.slice(0, text.lastIndexOf(robloxTransactionPrice)).trim()
@@ -1140,24 +1159,38 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       !isItemkuCard &&
       !isDanaCard &&
       !isLootbarCard &&
-      !isGogogoCard
+      !isGogogoCard &&
+      !isUnipinCard
     ) {
+      const struckEls = Array.from(card.querySelectorAll("del, s, [class*='line-through']"));
+      for (const s of struckEls) {
+        name = name.replace(clean(s.innerText), "");
+      }
+      if (discPriceRaw) {
+        name = name.replace(discPriceRaw, "");
+      }
       prices.forEach((p) => {
         name = name.replace(p, "");
       });
     }
     name = name
-      .replace(/-\d+\s*%/gi, "")
+      .replace(/-?\d+\s*%/gi, "")
       .replace(/\d+\s*\/\s*\d+\s*purchased/gi, "")
       .replace(/\s*-?\s*\(limited\)/gi, "")
       .replace(/\b(?:disc|diskon|promo)\b\s*\d*%?/gi, "")
       .replace(/\b(?:dari|best seller|rewards?)\b/gi, "")
+      .replace(/\s*\+\s*(?:coins?|points?|poin|cashback|rewards?|saldo|kupon)\b/gi, "")
       .replace(
         /\b(?:beli|buy|pilih|select|hemat|bonus|peman mencapai batas)\b/gi,
         "",
       )
+      .replace(/^[\[\]\(\)\s-]+/, "")
       .replace(/\s+/g, " ")
       .trim();
+
+    if (/^(\d[\d.,]*)\s+\d[\d.,]*$/.test(name)) {
+      name = name.replace(/\s+\d[\d.,]*$/, "").trim();
+    }
     if (
       isMobapayCard &&
       /\/mlbb(?:\/|$)/i.test(pathname) &&
@@ -1166,7 +1199,15 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       name = `${name} Diamonds`;
     }
 
-    if (name) pushRow(name, effectivePrice);
+    const isPaymentMethod =
+      /^(?:dana|gopay|ovo|linkaja|shopeepay|astrapay|qris|bca|bri|bni|cimb|mandiri|alfamart|indomaret|virtual account|transfer bank|kartu debit|kartu kredit|perbankan online|sms & seluler|otc non-bank)$/i.test(
+        name,
+      );
+    const isStreamingBundle = /\b(?:iqiyi|wetv|vidio|viu|netflix|spotify)\b/i.test(name);
+
+    if (name && !isPaymentMethod && !isStreamingBundle) {
+      pushRow(name, effectivePrice);
+    }
   }
 
   if (!results.length) {
@@ -1306,7 +1347,23 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       }
     }
 
-    const rows = specialRows ?? danaRows ?? genericRows ?? [];
+    let rows = specialRows ?? danaRows ?? genericRows ?? [];
+
+    const tempValidation = validateScrapeResults(url, rows, options.game);
+    if ((!rows.length || !tempValidation.valid || rows.length < 4) && process.env.GROQ_API_KEY) {
+      try {
+        console.log("Ekstraksi standar belum lengkap, mencoba Groq AI fallback...");
+        const pageText = await page.evaluate(() => document.body?.innerText || "");
+        const aiRows = await extractWithGroq(pageText, options.game || "");
+        if (aiRows && aiRows.length >= (rows.length || 1)) {
+          console.log(`[Groq AI] Berhasil mengekstrak ${aiRows.length} produk!`);
+          rows = aiRows;
+        }
+      } catch (err) {
+        console.log("[Groq AI] Fallback dilewati:", err.message);
+      }
+    }
+
     if (!rows.length) {
       throw new Error(
         "Data harga tidak ditemukan. Coba gunakan --selector dengan selector kartu produk.",
