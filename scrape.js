@@ -960,6 +960,14 @@ async function scrape(url, selector, headed, options = {}) {
       }
     }
 
+    if (url.hostname.endsWith("gogogo.id") && /roblox/i.test(url.pathname)) {
+      const globalInstanTab = page.getByText(/Roblox Global Instan/i).first();
+      if (await globalInstanTab.count()) {
+        await globalInstanTab.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(1_500);
+      }
+    }
+
     await page.locator(".animate-shimmer, [class*='skeleton']").first().waitFor({ state: "detached", timeout: 8_000 }).catch(() => {});
     await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
     await page.waitForTimeout(500);
