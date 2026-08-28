@@ -610,6 +610,7 @@ async function extractDitusiRows(page) {
   const collectVisible = async () => {
     const cards = await page.locator(".item-product-click").evaluateAll((els) =>
       els
+        .filter((el) => el.offsetParent !== null)
         .map((el) => {
           const t = el.innerText.replace(/\s+/g, " ").trim();
           const prices = t.match(/Rp\.?\s*[\d.]+/gi) || [];
@@ -637,6 +638,7 @@ async function extractDitusiRows(page) {
   });
 
   for (const labelText of subTabLabels) {
+    if (/usd|global|foreign|sar|brl/i.test(labelText)) continue;
     await page.evaluate((txt) => {
       const lbl = Array.from(
         document.querySelectorAll("#group-category-game label"),
