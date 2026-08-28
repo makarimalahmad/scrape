@@ -588,6 +588,13 @@ function parseDitusiProductRows(bodyText) {
 }
 
 async function extractDitusiRows(page) {
+  if (/roblox/i.test(page.url()) && !page.url().includes("voucher-roblox-robux")) {
+    await page.goto("https://ditusi.co.id/voucher-roblox-robux", {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForTimeout(1_500);
+  }
+
   await page.evaluate(() => {
     document
       .querySelectorAll(
@@ -596,15 +603,6 @@ async function extractDitusiRows(page) {
       .forEach((el) => el.remove());
     document.body.classList.remove("modal-open");
   });
-
-  // Switch to official Voucher Roblox / Robux if on Roblox page
-  await page.evaluate(() => {
-    const voucherBtn = Array.from(
-      document.querySelectorAll("#group-game label, .buying-step-card label"),
-    ).find((l) => /Voucher Roblox\s*\/\s*Robux/i.test(l.innerText));
-    if (voucherBtn) voucherBtn.click();
-  });
-  await page.waitForTimeout(1_000);
 
   const rows = [];
   const seen = new Set();
@@ -653,6 +651,16 @@ async function extractDitusiRows(page) {
 }
 
 async function extractHiddengameRows(page) {
+  if (
+    (page.url().includes("/games/roblox") || page.url().includes("roblox")) &&
+    !page.url().includes("giftcard")
+  ) {
+    await page.goto("https://hiddengame.id/games/roblox-giftcard", {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForTimeout(1_500);
+  }
+
   const cards = page.locator("div.product-item");
   const rawList = await cards.evaluateAll((elements) =>
     elements
@@ -977,6 +985,14 @@ async function scrape(url, selector, headed, options = {}) {
       }
     } else {
       await waitForProductData(page, 20_000, url.hostname);
+    }
+
+    if (url.hostname.endsWith("gogogo.id") && /roblox/i.test(url.pathname)) {
+      const globalInstanTab = page.getByText(/Roblox Global Instan/i).first();
+      if (await globalInstanTab.count()) {
+        await globalInstanTab.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(1_500);
+      }
     }
 
     let specialRows = await extractSpecialRows(page, url, interceptedPayloads);
