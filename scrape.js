@@ -1365,9 +1365,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     }
 
     if (!rows.length) {
-      throw new Error(
-        "Data harga tidak ditemukan. Coba gunakan --selector dengan selector kartu produk.",
-      );
+      throw new Error("Data harga tidak ditemukan pada halaman ini.");
     }
     return rows.map((row, index) => ({
       No: index + 1,
