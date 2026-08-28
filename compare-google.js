@@ -310,6 +310,9 @@ function normalizeStoreUrl(value, gameConfig) {
   if (hostname === "golrox.com" && url.pathname.startsWith("/beli-robux") && !url.pathname.includes("/instant")) {
     return new URL("https://golrox.com/beli-robux/instant");
   }
+  if (hostname === "hiddengame.id" && url.pathname === "/games/roblox") {
+    return new URL("https://hiddengame.id/games/roblox-giftcard");
+  }
   return url;
 }
 

@@ -557,15 +557,19 @@ async function extractShopeeRows(page) {
 function parseDitusiProductRows(bodyText) {
   const markerMatches = Array.from(
     String(bodyText || "").matchAll(
-      /Pilih Item Top Up (?:Free Fire|Roblox\s*-\s*Login)/gi,
+      /Pilih Item Top Up (?:Free Fire|Voucher\s*Roblox\s*\/\s*Robux|Roblox\s*-\s*Login)/gi,
     ),
   );
   const marker = markerMatches.at(-1);
   if (!marker) return [];
   const section = bodyText.slice(marker.index + marker[0].length);
   const rows = [];
-  const lines = section.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const productPattern = /^\d[\d.]*\s+(?:Diamonds?|Robux)(?:\s+USN)?(?:\s*\+\s*\(Bonus\s+\d[\d.]*\))?$/i;
+  const lines = section
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const productPattern =
+    /^(?:Roblox\s+Gift\s+card\s+IDR\s+\d+K|ROBLOX\d+K\d?|\d[\d.]*\s+(?:Diamonds?|Robux)(?:\s+USN)?(?:\s*\+\s*\(Bonus\s+\d[\d.]*\))?)$/i;
 
   for (let index = 0; index < lines.length; index += 1) {
     if (!productPattern.test(lines[index])) continue;
@@ -584,22 +588,97 @@ function parseDitusiProductRows(bodyText) {
 }
 
 async function extractDitusiRows(page) {
-  const ready = await page
-    .waitForFunction(
-      () =>
-        /Pilih Item Top Up Roblox\s*-\s*Login[\s\S]*?\d[\d.]*\s+Robux(?:\s+USN)?[\s\S]*?Rp\.?\s*[\d.]+/i.test(
-          document.body?.innerText || "",
-        ) ||
-        /Pilih Item Top Up Free Fire[\s\S]*?\d[\d.]*\s+Diamonds?[\s\S]*?Rp\.?\s*[\d.]+/i.test(
-          document.body?.innerText || "",
-        ),
-      null,
-      { timeout: 30_000, polling: 250 },
-    )
-    .then(() => true)
-    .catch(() => false);
-  if (!ready) return [];
-  return parseDitusiProductRows(await page.locator("body").innerText());
+  await page.evaluate(() => {
+    document
+      .querySelectorAll(
+        ".modal, .modal-backdrop, #modal-request-permission, #customModal",
+      )
+      .forEach((el) => el.remove());
+    document.body.classList.remove("modal-open");
+  });
+
+  // Switch to official Voucher Roblox / Robux if on Roblox page
+  await page.evaluate(() => {
+    const voucherBtn = Array.from(
+      document.querySelectorAll("#group-game label, .buying-step-card label"),
+    ).find((l) => /Voucher Roblox\s*\/\s*Robux/i.test(l.innerText));
+    if (voucherBtn) voucherBtn.click();
+  });
+  await page.waitForTimeout(1_000);
+
+  const rows = [];
+  const seen = new Set();
+
+  const collectVisible = async () => {
+    const cards = await page.locator(".item-product-click").evaluateAll((els) =>
+      els
+        .map((el) => {
+          const t = el.innerText.replace(/\s+/g, " ").trim();
+          const prices = t.match(/Rp\.?\s*[\d.]+/gi) || [];
+          const prod = t.split(/Rp\.?/i)[0].replace(/Termurah/gi, "").trim();
+          return prod && prices.length ? { Produk: prod, Harga: prices[0] } : null;
+        })
+        .filter(Boolean),
+    );
+    for (const c of cards) {
+      const k = `${c.Produk.toLowerCase()}|${c.Harga.toLowerCase()}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        rows.push(c);
+      }
+    }
+  };
+
+  await collectVisible();
+
+  // If sub-tabs exist (like Roblox Robux Instan), click through each
+  const subTabLabels = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll("#group-category-game label"))
+      .map((l) => l.innerText?.trim())
+      .filter(Boolean);
+  });
+
+  for (const labelText of subTabLabels) {
+    await page.evaluate((txt) => {
+      const lbl = Array.from(
+        document.querySelectorAll("#group-category-game label"),
+      ).find((l) => l.innerText?.trim() === txt);
+      if (lbl) lbl.click();
+    }, labelText);
+    await page.waitForTimeout(1_000);
+    await collectVisible();
+  }
+
+  return rows;
+}
+
+async function extractHiddengameRows(page) {
+  const cards = page.locator("div.product-item");
+  const rawList = await cards.evaluateAll((elements) =>
+    elements
+      .map((card) => {
+        const title =
+          card.querySelector("input[data-title]")?.getAttribute("data-title") ||
+          card.querySelector(".product-title")?.innerText?.replace(/\s+/g, " ").trim();
+        const price = card
+          .querySelector(".current-price, .pricing")
+          ?.innerText?.replace(/\s+/g, " ")
+          .match(/Rp\s*[\d.]+/i)?.[0];
+        return title && price ? { Produk: title, Harga: price } : null;
+      })
+      .filter(Boolean),
+  );
+
+  const seen = new Set();
+  const rows = [];
+  for (const item of rawList) {
+    const key = `${item.Produk.toLowerCase()}|${item.Harga.toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      rows.push(item);
+    }
+  }
+  return rows;
 }
 
 async function extractVexagameRows(page) {
@@ -647,6 +726,7 @@ async function extractSpecialRows(page, url, interceptedPayloads = []) {
   if (hostname === "topup.ebelanja.id") return extractEbelanjaRows(page);
   if (hostname === "shopee.co.id") return extractShopeeRows(page);
   if (hostname === "ditusi.co.id") return extractDitusiRows(page);
+  if (hostname === "hiddengame.id") return extractHiddengameRows(page);
   if (hostname === "vexagame.com") return extractVexagameRows(page);
   if (hostname === "unipin.com" && /roblox/i.test(url.pathname)) {
     return extractUnipinRobloxRows(page);
@@ -769,12 +849,13 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
     "upoint.id": ".cursor-pointer",
     "duniagames.co.id": ".denom .price-dnm .pr",
     "unipin.com": ".denom-container > button",
+    "hiddengame.id": "div.product-item",
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
     const ready = await page
       .locator(readinessSelector)
-      .filter({ hasText: /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|^\s*[1-9]\d{0,2}(?:\.\d{3})*\s*$)/i })
+      .filter({ hasText: /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|Rp\.?\s*\d|^\s*[1-9]\d{0,2}(?:\.\d{3})*\s*$)/i })
       .first()
       .waitFor({ state: "visible", timeout })
       .then(() => true)
