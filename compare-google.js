@@ -176,12 +176,8 @@ function selectGoogleCompetitors(results, gameConfig, limit) {
 function getArgument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
   if (index < 0) return fallback;
-  const values = [];
-  for (let i = index + 1; i < process.argv.length; i += 1) {
-    if (process.argv[i].startsWith("--")) break;
-    values.push(process.argv[i]);
-  }
-  return values.length > 0 ? values.join(" ") : fallback;
+  const value = process.argv[index + 1];
+  return value && !value.startsWith("--") ? value : fallback;
 }
 
 function formatPrice(value) {
@@ -827,9 +823,8 @@ async function main() {
     ? GAME_CONFIGS
     : GAME_CONFIGS.filter((game) =>
         gameId
-          .split(/[,\s]+/)
+          .split(",")
           .map((id) => id.trim().toLowerCase())
-          .filter(Boolean)
           .includes(game.id),
       );
   if (!selectedGames.length) {
