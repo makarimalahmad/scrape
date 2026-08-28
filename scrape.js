@@ -1105,7 +1105,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     )
       return;
 
-    // Normalisasi Pajak (PPN 11%): Menyesuaikan harga display sebelum pajak menjadi harga final
+    // Normalisasi Pajak (PPN 11%)
     if (isTaxExcluded) {
       const rawNumber = Number(digits);
       const withTax = Math.round(rawNumber * 1.11);

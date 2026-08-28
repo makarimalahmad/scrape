@@ -15,7 +15,13 @@ const { findMatches } = require("./product-matcher");
 
 function getArgument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
-  return index === -1 ? fallback : process.argv[index + 1];
+  if (index === -1) return fallback;
+  const values = [];
+  for (let i = index + 1; i < process.argv.length; i += 1) {
+    if (process.argv[i].startsWith("--")) break;
+    values.push(process.argv[i]);
+  }
+  return values.length > 0 ? values.join(" ") : fallback;
 }
 
 function matchStoreToAnchors(anchors, store) {
@@ -457,8 +463,9 @@ async function main() {
     ? GAME_CONFIGS
     : GAME_CONFIGS.filter((game) =>
         gameId
-          .split(",")
+          .split(/[,\s]+/)
           .map((id) => id.trim().toLowerCase())
+          .filter(Boolean)
           .includes(game.id),
       );
   if (!selectedGames.length) {
