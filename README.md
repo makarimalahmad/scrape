@@ -1,13 +1,13 @@
 # @makarimalahmad/price-scraper-sdk
 
-SDK Node.js untuk ekstraksi data harga dan perbandingan harga kompetitor voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**) berbasis pencarian Google Organik (SerpAPI), dilengkapi dengan modul normalisasi produk, validasi kelayakan data, serta opsi ekspor ke format CSV dan Excel (.xlsx).
+SDK Node.js untuk ekstraksi data harga dan perbandingan harga kompetitor voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**) berbasis pencarian Google Organik (SerpAPI), dilengkapi dengan normalisasi produk, validasi kelayakan data, serta opsi ekspor ke format CSV dan Excel (.xlsx).
 
 ---
 
 ## 📦 Instalasi
 
 ### 1. Konfigurasi `.npmrc`
-Karena paket ini didistribusikan melalui GitHub Packages, tambahkan konfigurasi registry pada file `.npmrc` di root direktori project Anda:
+Tambahkan konfigurasi registry GitHub Packages pada file `.npmrc` di root direktori project Anda:
 
 ```text
 @makarimalahmad:registry=https://npm.pkg.github.com
@@ -18,7 +18,7 @@ Karena paket ini didistribusikan melalui GitHub Packages, tambahkan konfigurasi 
 npm install @makarimalahmad/price-scraper-sdk
 ```
 
-> **Prasyarat Browser:** Pastikan runtime Chromium Playwright sudah terpasang di sistem:
+> **Prasyarat:** Pastikan runtime Chromium Playwright sudah terpasang:
 > ```bash
 > npx playwright install chromium
 > ```
@@ -26,8 +26,6 @@ npm install @makarimalahmad/price-scraper-sdk
 ---
 
 ## ⚙️ Konfigurasi Environment (`.env`)
-
-Untuk fitur pencarian kompetitor otomatis melalui SerpAPI, sediakan environment variable berikut:
 
 ```env
 SERPAPI_KEY=your_serpapi_key_here
@@ -39,20 +37,19 @@ GROQ_API_KEY=your_groq_api_key_here # (Opsional: untuk ekstraksi fallback berbas
 ## 🚀 Panduan Penggunaan
 
 ### 1. Ekstraksi Data dari 1 URL Toko (`scrapeUrl`)
-Mengambil daftar produk dan harga dari URL toko target secara langsung.
+Mengambil seluruh daftar produk dan harga dari halaman toko target.
 
 ```javascript
 const { scrapeUrl } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
   const result = await scrapeUrl("https://hiddengame.id/games/roblox-giftcard", {
-    headed: false,               // true untuk menjalankan browser terlihat
-    exportCsvPath: "./data.csv", // Opsional: simpan hasil ke CSV
+    headed: false,               // true jika ingin menjalankan browser dengan tampilan
+    exportCsvPath: "./data.csv", // Opsional: simpan hasil langsung ke CSV
   });
 
-  console.log("Status Berhasil:", result.success);
-  console.log("Jumlah Produk:", result.count);
-  console.log("Skor Confidence:", result.confidence);
+  console.log("Status:", result.success);
+  console.log("Total Produk:", result.count);
   console.log("Daftar Produk:", result.products);
 }
 
@@ -62,24 +59,24 @@ main();
 ---
 
 ### 2. Komparasi Harga Game via Google (`compareGame`)
-Mencari kompetitor organik Google melalui SerpAPI, melakukan scraping multi-store secara paralel, menormalkan paket nominal, dan menyusun tabel komparasi harga terendah.
+Mencari kompetitor organik Google melalui SerpAPI, melakukan scraping multi-store secara paralel, menormalkan paket nominal, dan menyusun tabel komparasi harga terendah beserta ekspor Excel.
 
 ```javascript
 const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
-  // Pilihan game: "roblox", "free-fire", atau "mobile-legends"
+  // Pilihan game: "mobile-legends", "free-fire", atau "roblox"
   const result = await compareGame("roblox", {
-    limit: 5,                          // Jumlah kompetitor Google yang di-scrape (default: 10)
+    limit: 5,                          // Jumlah toko kompetitor Google (default: 10)
     concurrency: 2,                     // Jumlah browser paralel (default: 3)
-    exportXlsxDirectory: "./laporan",   // Opsional: simpan hasil ke file Excel (.xlsx)
+    exportXlsxDirectory: "./laporan",   // Opsional: simpan file Excel (.xlsx)
   });
 
   console.log("Game:", result.game);
   console.log("Toko Berhasil:", result.successfulStoreCount);
   console.log("Tabel Komparasi:", result.comparisonTable);
-  console.log("Ringkasan Toko Termurah:", result.summary);
-  console.log("Lokasi File Excel:", result.xlsxFilePath);
+  console.log("Toko Termurah:", result.summary);
+  console.log("File Excel:", result.xlsxFilePath);
 }
 
 main();
@@ -88,7 +85,7 @@ main();
 ---
 
 ### 3. Komparasi Langsung Antara 2 URL (`compareUrls`)
-Membandingkan harga antara dua URL toko spesifik secara *pairwise* tanpa memerlukan SerpAPI Google.
+Membandingkan harga antara dua link toko secara langsung tanpa memerlukan SerpAPI Google.
 
 ```javascript
 const { compareUrls } = require("@makarimalahmad/price-scraper-sdk");
@@ -103,7 +100,7 @@ async function main() {
     }
   );
 
-  console.log("Hasil Pasangan Komparasi:", result.comparisonRows);
+  console.log("Hasil Komparasi:", result.comparisonRows);
 }
 
 main();
@@ -111,13 +108,12 @@ main();
 
 ---
 
-### 4. Normalisasi & Pencocokan Produk
-Modul untuk standarisasi nama paket dan pencocokan nominal produk antar toko.
+### 4. Normalisasi Produk (`parseProduct`)
+Menstandarisasi string nama paket menjadi objek terstruktur.
 
 ```javascript
-const { parseProduct, matchProducts } = require("@makarimalahmad/price-scraper-sdk");
+const { parseProduct } = require("@makarimalahmad/price-scraper-sdk");
 
-// Normalisasi string produk menjadi objek terstruktur
 const item = parseProduct("500 Robux Promo", "roblox");
 console.log(item);
 // Output: { key: '500 Robux', category: 'robux', quantity: 500, unit: 'Robux' }
@@ -132,52 +128,36 @@ console.log(item);
 | :--- | :--- | :---: | :---: | :--- |
 | `gameId` | `string` | **Ya** | - | ID game target: `"mobile-legends"`, `"free-fire"`, atau `"roblox"`. |
 | `options.limit` | `number` | Tidak | `10` | Jumlah kompetitor teratas dari pencarian Google (1–10). |
-| `options.concurrency` | `number` | Tidak | `3` | Jumlah proses browser paralel (1–4). |
-| `options.maxAttempts` | `number` | Tidak | `3` | Batas percobaan ulang (retry) per toko jika terjadi kendala jaringan (1–5). |
-| `options.headed` | `boolean` | Tidak | `false` | Menampilkan window browser jika bernilai `true`. |
-| `options.apiKey` | `string` | Tidak | `.env` | SerpAPI Key jika tidak dikonfigurasi melalui environment variable. |
-| `options.exportXlsxDirectory` | `string` | Tidak | `null` | Path folder untuk menyimpan laporan Excel (.xlsx). |
+| `options.concurrency` | `number` | Tidak | `3` | Jumlah browser paralel (1–4). |
+| `options.maxAttempts` | `number` | Tidak | `3` | Batas percobaan ulang per toko jika gagal (1–5). |
+| `options.headed` | `boolean` | Tidak | `false` | Menampilkan jendela browser jika bernilai `true`. |
+| `options.apiKey` | `string` | Tidak | `.env` | SerpAPI Key jika tidak diset via environment variable. |
+| `options.exportXlsxDirectory` | `string` | Tidak | `null` | Path folder untuk menyimpan file Excel (.xlsx). |
 
 ### `scrapeUrl(url, [options])`
 | Parameter | Tipe | Wajib | Default | Deskripsi |
 | :--- | :--- | :---: | :---: | :--- |
-| `url` | `string` | **Ya** | - | URL halaman produk toko yang akan diekstraksi. |
-| `options.gameId` | `string` | Tidak | `null` | ID game untuk keperluan validasi relevansi data. |
-| `options.selector` | `string` | Tidak | `null` | Custom CSS selector target elemen produk jika diperlukan. |
-| `options.headed` | `boolean` | Tidak | `false` | Menjalankan browser dalam mode visible. |
-| `options.exportCsvPath` | `string` | Tidak | `null` | Path file untuk menyimpan hasil scraping ke format CSV. |
+| `url` | `string` | **Ya** | - | URL toko target yang akan diekstraksi. |
+| `options.gameId` | `string` | Tidak | `null` | ID game untuk validasi domain. |
+| `options.headed` | `boolean` | Tidak | `false` | Menjalankan browser terlihat. |
+| `options.exportCsvPath` | `string` | Tidak | `null` | Path file untuk menyimpan hasil ke CSV. |
 
 ### `compareUrls(mainUrl, competitorUrl, [options])`
 | Parameter | Tipe | Wajib | Default | Deskripsi |
 | :--- | :--- | :---: | :---: | :--- |
-| `mainUrl` | `string` | **Ya** | - | URL toko utama sebagai acuan komparasi. |
+| `mainUrl` | `string` | **Ya** | - | URL toko utama acuan. |
 | `competitorUrl` | `string` | **Ya** | - | URL toko pembanding. |
-| `options.game` | `string` | Tidak | `"mobile-legends"` | ID game target komparasi. |
-| `options.exportCsvPath` | `string` | Tidak | `null` | Path file untuk menyimpan hasil komparasi ke CSV. |
-
----
-
-## 🛠️ Daftar Modul & Fungsi yang Diekspor
-
-| Kategori | Nama Fungsi / Variabel |
-| :--- | :--- |
-| **Fasade Utama** | `scrapeUrl`, `compareGame`, `compareUrls` |
-| **Utilitas Ekspor** | `exportXlsx`, `exportCsv`, `createScrapeWorkbook`, `saveInvalidReport` |
-| **Normalisasi & Pencocokan** | `matchProducts`, `parseProduct`, `parsePrice`, `selectCheapestProducts`, `createProductAnchors`, `createScrapeRows`, `matchStoreToAnchors`, `calculateComparison`, `selectBenchmark` |
-| **Validasi & AI Fallback** | `validateScrapeResults`, `extractWithGroq` |
-| **Integrasi Google & Scraper** | `searchGoogle`, `selectGoogleCompetitors`, `classifyTopUpCompetitorResult`, `scrapeStore`, `createPairRows`, `exportComparisonFiles`, `scrape` |
-| **Konfigurasi & Metadata** | `GAME_CONFIGS`, `MAIN_STORE_DOMAINS`, `isMainStoreUrl`, `normalizeHostname` |
+| `options.game` | `string` | Tidak | `"mobile-legends"` | Game target komparasi. |
+| `options.exportCsvPath` | `string` | Tidak | `null` | Path file untuk menyimpan hasil ke CSV. |
 
 ---
 
 ## ⚠️ Catatan Operasional
-Scraper ini dirancang adaptif terhadap berbagai struktur halaman e-commerce voucher game di Indonesia. Namun, perubahan struktur DOM, proteksi bot (Cloudflare/CAPTCHA), atau pembaruan layout dari situs target dapat memengaruhi hasil ekstraksi.
+Scraper ini dirancang adaptif terhadap berbagai struktur situs top-up game. Namun, perubahan struktur DOM, proteksi Cloudflare Turnstile/CAPTCHA, atau pembaruan layout dari situs target dapat memengaruhi hasil ekstraksi.
 
 ---
 
 ## 🧪 Pengujian
-
-Jalankan rangkaian unit test lokal:
 
 ```bash
 npm test
