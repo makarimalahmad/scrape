@@ -1,7 +1,7 @@
 {
-  "name": "scrap",
+  "name": "@makarimalahmad/price-scraper-sdk",
   "version": "1.0.0",
-  "description": "",
+  "description": "SDK Scraper & Price Comparison Engine for Mobile Legends, Free Fire, and Roblox",
   "main": "index.js",
   "scripts": {
     "scrape": "node scrape.js",
@@ -9,12 +9,19 @@
     "compare:url": "node compare-url.js",
     "compare:google": "node compare-google.js",
     "search:top": "node search-top-and-scrape.js",
-    "test": "node --check scrape.js && node --check scrape-new.js && node --check compare-url.js && node --check search-top-and-scrape.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js && node tests/validate-results.test.js && node tests/compare-google.test.js && node tests/scrape-new.test.js"
+    "test": "node --check index.js && node --check scrape.js && node --check scrape-new.js && node --check compare-url.js && node --check search-top-and-scrape.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js && node tests/sdk.test.js && node tests/validate-results.test.js && node tests/compare-google.test.js && node tests/scrape-new.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/makarimalahmad/scrape.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "dependencies": {
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",

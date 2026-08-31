@@ -368,11 +368,13 @@ async function scrapeStore(store, gameConfig, options) {
     }
   }
 
-  const scrapeFilePath = exportScrapeFile(
-    allRows,
-    store,
-    options.scrapeOutputDirectory,
-  );
+  const scrapeFilePath = options.scrapeOutputDirectory
+    ? exportScrapeFile(
+        allRows,
+        store,
+        options.scrapeOutputDirectory,
+      )
+    : null;
   return {
     name: store.name || store.store,
     url: primaryUrl.href,

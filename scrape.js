@@ -894,6 +894,7 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
 }
 
 async function scrape(url, selector, headed, options = {}) {
+  url = url instanceof URL ? url : new URL(url);
   const ownsBrowser = !options.browser;
   const browser = options.browser || await chromium.launch({ headless: !headed });
   let context = null;
