@@ -1,6 +1,6 @@
 {
   "name": "@makarimalahmad/price-scraper-sdk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "SDK Scraper & Price Comparison Engine for Mobile Legends, Free Fire, and Roblox",
   "main": "index.js",
   "scripts": {
