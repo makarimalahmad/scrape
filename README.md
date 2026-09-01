@@ -32,6 +32,9 @@ node scrape-new.js --game mobile-legends
 
 # Komparasi seluruh game sekaligus
 node scrape-new.js --game all
+
+# Opsi tambahan (opsional)
+node scrape-new.js --game roblox --limit 10 --attempts 3 --concurrency 3 --headed
 ```
 
 ### 2. Scrape Cepat 1 URL Toko
