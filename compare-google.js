@@ -375,6 +375,7 @@ async function scrapeStore(store, gameConfig, options) {
         options.scrapeOutputDirectory,
       )
     : null;
+  const usedAiFallback = Boolean(allRows._usedAiFallback || allRows.some((r) => r._usedAiFallback));
   return {
     name: store.name || store.store,
     url: primaryUrl.href,
@@ -382,6 +383,11 @@ async function scrapeStore(store, gameConfig, options) {
     confidence: lowestConfidence,
     rawProductCount: allRows.length,
     scrapeFilePath,
+    usedAiFallback,
+    status: usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
+    reason: usedAiFallback
+      ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+      : null,
     products: selectCheapestProducts(allRows, gameConfig.id),
   };
 }

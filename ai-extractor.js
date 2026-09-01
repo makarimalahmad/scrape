@@ -61,7 +61,15 @@ ${pageText.slice(0, 15000)}`;
         ? parsed
         : [];
 
-    return products.filter((p) => p.Produk && p.Harga);
+    return products
+      .filter((p) => p.Produk && p.Harga)
+      .map((p) => {
+        let name = String(p.Produk).trim();
+        if (/roblox/i.test(gameName) && /^(?:IDR|USD|\$)\s*[\d.]+/i.test(name)) {
+          name = `Roblox ${name}`;
+        }
+        return { Produk: name, Harga: String(p.Harga).trim() };
+      });
   } catch (err) {
     console.log("[Groq AI] Error koneksi:", err.message);
     return null;

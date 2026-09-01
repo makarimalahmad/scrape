@@ -72,6 +72,7 @@ async function scrapeUrl(url, options = {}) {
       csvPath = exportCsv(rawRows, options.exportCsvPath);
     }
 
+    const usedAiFallback = Boolean(rawRows?._usedAiFallback || rawRows?.some((r) => r._usedAiFallback));
     return {
       success: validation.valid,
       url,
@@ -79,6 +80,8 @@ async function scrapeUrl(url, options = {}) {
       count: products.length,
       confidence: validation.confidence,
       status: validation.status,
+      usedAiFallback,
+      extractionMethod: usedAiFallback ? "ai_fallback" : "standard",
       reasons: validation.reasons,
       csvPath,
     };
@@ -298,15 +301,30 @@ async function compareGame(gameId, options = {}) {
     generatedAt: new Date().toISOString(),
     storeCount: allStores.length,
     successfulStoreCount: allStores.filter(isStoreSuccess).length,
-    stores: allStores.map((s) => ({
-      name: s.name,
-      url: s.url,
-      position: s.position || null,
-      success: isStoreSuccess(s),
-      productCount: s.products?.size || 0,
-      confidence: s.confidence || 0,
-      error: s.error || null,
-    })),
+    stores: allStores.map((s) => {
+      const success = isStoreSuccess(s);
+      let status = "FAILED";
+      let reason = s.error || null;
+      if (success) {
+        status = s.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS";
+        reason = s.usedAiFallback
+          ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+          : null;
+      } else if (String(s.error || "").toLowerCase().includes("fallback")) {
+        status = "FAILED_FALLBACK";
+        reason = s.error;
+      }
+      return {
+        name: s.name,
+        classification: s.position == null || s.position === "Utama" ? "MAIN_STORE" : "COMPETITOR",
+        position: s.position === "Utama" ? null : (s.position || null),
+        url: s.url,
+        productCount: s.products?.size || 0,
+        status,
+        reason,
+        confidence: s.confidence || 0,
+      };
+    }),
     comparisonTable: comparisonRows,
     summary,
     xlsxFilePath,

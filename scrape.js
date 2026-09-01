@@ -746,13 +746,16 @@ async function extractSpecialRows(page, url, interceptedPayloads = []) {
 
 async function createOptimizedContext(browser) {
   return browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 800 },
     locale: "id-ID",
     timezoneId: "Asia/Jakarta",
   });
 }
 
 const CLOUDFLARE_CHALLENGE_PATTERN =
-  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i;
+  /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda|just a moment/i;
 
 async function findTurnstileFrame(page, timeout = 1_000) {
   const deadline = Date.now() + timeout;
@@ -771,7 +774,13 @@ async function findTurnstileFrame(page, timeout = 1_000) {
 async function pageShowsCloudflareChallenge(page) {
   const title = await page.title().catch(() => "");
   const bodyText = await page.locator("body").innerText().catch(() => "");
-  return CLOUDFLARE_CHALLENGE_PATTERN.test(`${title}\n${bodyText}`);
+  const hasTurnstileFrame = page
+    .frames()
+    .some((candidate) => candidate.url().includes("challenges.cloudflare.com"));
+  return (
+    CLOUDFLARE_CHALLENGE_PATTERN.test(`${title}\n${bodyText}`) ||
+    hasTurnstileFrame
+  );
 }
 
 async function clickTurnstileFrame(page, frame) {
@@ -935,9 +944,18 @@ async function scrape(url, selector, headed, options = {}) {
       }
       throw error;
     }
-    await page.locator("body").waitFor({ state: "visible", timeout: 15_000 });
+    await page.locator("body").waitFor({ state: "attached", timeout: 15_000 }).catch(() => {});
 
-    if (response?.status() === 403 || (await pageShowsCloudflareChallenge(page))) {
+    let hasCloudflare =
+      response?.status() === 403 || (await pageShowsCloudflareChallenge(page));
+    if (!hasCloudflare) {
+      const turnstileFrame = await findTurnstileFrame(page, 2_500);
+      if (turnstileFrame || (await pageShowsCloudflareChallenge(page))) {
+        hasCloudflare = true;
+      }
+    }
+
+    if (hasCloudflare) {
       const isDitusi = url.hostname.replace(/^www\./, "") === "ditusi.co.id";
       const challenge = await solveCloudflareChallenge(page, {
         timeout: 120_000,
@@ -955,8 +973,9 @@ async function scrape(url, selector, headed, options = {}) {
       console.log(
         `Cloudflare lolos setelah ${challenge.clickCount} klik. Menunggu produk dimuat...`,
       );
-      await waitForProductData(page, 30_000, url.hostname);
     }
+
+    await waitForProductData(page, 30_000, url.hostname);
 
     if (/ourastore\.com$|bangjeff\.com$/i.test(url.hostname)) {
       const waitForProductCards = () =>
@@ -1096,7 +1115,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
   const noisePattern =
     /^(?:potongan penuh|hemat|biaya admin|harga awal|total bayar|gimcashback|memakai|kirim pesanan|10% s\.d\.|4\.9|min\.?$)/i;
   const paymentNoise =
-    /(?:cashback|ewallet|mbanking|transfer bank|tranfer bank|gerai ritel|alfamart|saldo reseller|qris|qr kode|\bva\b)/i;
+    /(?:cashback|ewallet|mbanking|transfer bank|tranfer bank|gerai ritel|alfamart|saldo reseller|qris|qr kode|\bva\b|linkaja|shopeepay|gopay|ovo\b)/i;
   const recommendationNoise =
     /(?:arena of valor|call of duty|free fire max|speed drifters|\bundawn\b)/i;
 
@@ -1112,7 +1131,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     );
 
   const pushRow = (product, harga) => {
-    const cleanProduct = clean(product);
+    let cleanProduct = clean(product);
     let cleanHarga = clean(harga);
     if (!cleanProduct || !cleanHarga || cleanProduct.length > 200) return;
     const digits = cleanHarga.replace(/[^\d]/g, "");
@@ -1123,6 +1142,12 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       recommendationNoise.test(cleanProduct)
     )
       return;
+
+    if (/roblox/i.test(pathname) || isGiftCardOrRoblox) {
+      if (/^(?:IDR|USD|\$)\s*[\d.]+/i.test(cleanProduct)) {
+        cleanProduct = `Roblox ${cleanProduct}`;
+      }
+    }
 
     // Normalisasi Pajak (PPN 11%): Menyesuaikan harga display sebelum pajak menjadi harga final
     if (isTaxExcluded) {
@@ -1160,7 +1185,7 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
             ? "li.topup-list-con-item"
             : isGogogo
               ? '[data-testid^="qa-product-item-card-container-"]'
-              : '.pDRoot, .mobapay-recharge-item, [class*="recharge-item"], [class*="product-card"], .form-check-label-rounded-lg, [class*="group/variant"], .sku-card, .highlighted-sku-card, .denom-container > button, .main-info, div[class*="cursor-pointer"]';
+              : '.pDRoot, .mobapay-recharge-item, [class*="recharge-item"], [class*="product-card"], .form-check-label-rounded-lg, [class*="group/variant"], .sku-card, .highlighted-sku-card, .denom-container > button, .main-info, div[class*="cursor-pointer"], .g-content-flex-wrap > div, .g-content-relative';
   let productCards = [];
   try {
     productCards = Array.from(document.querySelectorAll(productSelector));
@@ -1169,10 +1194,16 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
   }
   productCards = productCards.filter((card) => {
     const parentClass = String(card.parentElement?.className || "");
-    return (
-      !parentClass.includes("sku-list") &&
-      !parentClass.includes("highlighted-skus__list")
-    );
+    if (
+      parentClass.includes("sku-list") ||
+      parentClass.includes("highlighted-skus__list")
+    ) {
+      return false;
+    }
+    if (card.querySelector('.sku-card, [class*="group/variant"]')) {
+      return false;
+    }
+    return true;
   });
   for (const card of productCards) {
     const text = clean(card.innerText);
@@ -1245,9 +1276,10 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     const discPriceRaw = clean(discEl?.innerText);
     const genericDiscountedPrice = discPriceRaw ? (/(?:Rp|IDR|\$)/i.test(discPriceRaw) ? discPriceRaw : `Rp ${discPriceRaw}`) : null;
 
+    const rpMatch = prices.find((p) => /^Rp\.?\s*\d/i.test(p));
     const effectivePrice = isMobapayCard || isDuniaGamesCard
       ? prices[prices.length - 1]
-      : unipinPrice || genericDiscountedPrice || gogogoPrice || lootbarPrice || danaPrice || itemkuPrice || robloxTransactionPrice || upointPrice || prices[0];
+      : unipinPrice || genericDiscountedPrice || gogogoPrice || lootbarPrice || danaPrice || itemkuPrice || robloxTransactionPrice || upointPrice || rpMatch || prices[0];
     let name = isUpointCard
       ? upointParts[0].trim()
       : isDuniaGamesCard
@@ -1279,12 +1311,12 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       for (const s of struckEls) {
         name = name.replace(clean(s.innerText), "");
       }
-      if (discPriceRaw) {
+      if (discPriceRaw && discPriceRaw !== effectivePrice) {
         name = name.replace(discPriceRaw, "");
       }
-      prices.forEach((p) => {
-        name = name.replace(p, "");
-      });
+      if (effectivePrice) {
+        name = name.replace(effectivePrice, "");
+      }
     }
     name = name
       .replace(/-?\d+\s*%/gi, "")
@@ -1452,39 +1484,98 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
           }
         }
       } else {
-        genericRows = await page.evaluate(evaluateDomProducts, {
-          defaultSelector: selector,
-          hostname: url.hostname,
-          pathname: url.pathname,
-        });
+        const universalCategoryTabs = [
+          "Roblox - Instant",
+          "Roblox Gift Card",
+          "Roblox Global Instan",
+        ];
+        let tabCollectedRows = [];
+        for (const tabName of universalCategoryTabs) {
+          const tabEl = page.getByText(tabName, { exact: true }).first();
+          if (await tabEl.count()) {
+            await tabEl.click({ force: true }).catch(() => {});
+            await page.waitForTimeout(1_200);
+            const tabRows = await page.evaluate(evaluateDomProducts, {
+              defaultSelector: selector,
+              hostname: url.hostname,
+              pathname: url.pathname,
+            });
+            if (tabRows && tabRows.length > 0) {
+              tabCollectedRows.push(...tabRows);
+            }
+          }
+        }
+
+        if (tabCollectedRows.length > 0) {
+          const seen = new Set();
+          genericRows = [];
+          for (const row of tabCollectedRows) {
+            const key = `${String(row.Produk).toLowerCase()}|${String(row.Harga).toLowerCase()}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              genericRows.push(row);
+            }
+          }
+        } else {
+          genericRows = await page.evaluate(evaluateDomProducts, {
+            defaultSelector: selector,
+            hostname: url.hostname,
+            pathname: url.pathname,
+          });
+        }
       }
     }
 
     let rows = specialRows ?? danaRows ?? genericRows ?? [];
 
-    const tempValidation = validateScrapeResults(url, rows, options.game);
+    let usedAiFallback = false;
+    const detectedGame =
+      options.game ||
+      (/roblox/i.test(url.pathname)
+        ? "roblox"
+        : /free-fire/i.test(url.pathname)
+          ? "free-fire"
+          : /mobile-legends/i.test(url.pathname)
+            ? "mobile-legends"
+            : "");
+    const tempValidation = validateScrapeResults(url, rows, detectedGame);
+    let triedAiFallback = false;
+    let aiFallbackError = null;
     if ((!rows.length || !tempValidation.valid || rows.length < 4) && process.env.GROQ_API_KEY) {
+      triedAiFallback = true;
       try {
         console.log("Ekstraksi standar belum lengkap, mencoba Groq AI fallback...");
         const pageText = await page.evaluate(() => document.body?.innerText || "");
-        const aiRows = await extractWithGroq(pageText, options.game || "");
+        const aiRows = await extractWithGroq(pageText, detectedGame || options.game || "");
         if (aiRows && aiRows.length >= (rows.length || 1)) {
           console.log(`[Groq AI] Berhasil mengekstrak ${aiRows.length} produk!`);
           rows = aiRows;
+          usedAiFallback = true;
         }
       } catch (err) {
+        aiFallbackError = err.message;
         console.log("[Groq AI] Fallback dilewati:", err.message);
       }
     }
 
     if (!rows.length) {
-      throw new Error("Data harga tidak ditemukan pada halaman ini.");
+      const err = new Error(
+        triedAiFallback && !aiFallbackError
+          ? "Ekstraksi standar dan Groq AI Fallback keduanya tidak menemukan data harga pada halaman ini."
+          : "Data harga tidak ditemukan pada halaman ini."
+      );
+      err.triedAiFallback = triedAiFallback;
+      err.aiFallbackError = aiFallbackError;
+      throw err;
     }
-    return rows.map((row, index) => ({
+    const finalRows = rows.map((row, index) => ({
       No: index + 1,
       ...row,
       Sumber: url.href,
+      _usedAiFallback: usedAiFallback || Boolean(row._usedAiFallback),
     }));
+    finalRows._usedAiFallback = usedAiFallback;
+    return finalRows;
   } finally {
     if (context) await context.close().catch(() => {});
     if (ownsBrowser) await browser.close().catch(() => {});

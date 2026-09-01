@@ -418,30 +418,63 @@ async function processGame(apiKey, gameConfig, options) {
     rows,
     options.outputDirectory,
   );
+  const allStoreEntries = [
+    ...mainStores.map((store) => ({
+      name: store.name,
+      classification: "MAIN_STORE",
+      position: null,
+      url: store.url,
+      productCount: store.products.size,
+      status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
+      reason: store.usedAiFallback
+        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+        : null,
+    })),
+    ...competitors.map((store) => ({
+      name: store.name,
+      classification: "COMPETITOR",
+      position: store.position,
+      url: store.url,
+      productCount: store.products.size,
+      status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
+      reason: store.usedAiFallback
+        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+        : null,
+    })),
+    ...failedMainStores.map((store) => ({
+      name: store.name || store.store,
+      classification: "MAIN_STORE",
+      position: null,
+      url: store.url,
+      productCount: 0,
+      status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
+      reason: store.error || "Gagal melakukan ekstraksi data",
+    })),
+    ...failedCompetitors.map((store) => ({
+      name: store.name || store.store,
+      classification: "COMPETITOR",
+      position: store.position,
+      url: store.url,
+      productCount: 0,
+      status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
+      reason: store.error || "Gagal melakukan ekstraksi data",
+    })),
+  ];
+
   return {
-    success: true,
     game: gameConfig.name,
     gameId: gameConfig.id,
-    ranking,
-    rankingAudit,
-    scrapeRowCount: rows.length,
-    csvPath,
-    xlsxPath,
-    mainStores: mainStores.map((store) => ({
-      name: store.name,
-      url: store.url,
-      productCount: store.products.size,
-      scrapeFilePath: store.scrapeFilePath,
-    })),
-    competitors: competitors.map((store) => ({
-      position: store.position,
-      name: store.name,
-      url: store.url,
-      productCount: store.products.size,
-      scrapeFilePath: store.scrapeFilePath,
-    })),
-    failedMainStores,
-    failedCompetitors,
+    success: true,
+    files: {
+      xlsx: xlsxPath,
+      csv: csvPath,
+    },
+    summary: {
+      totalStores: allStoreEntries.length,
+      successfulStores: allStoreEntries.filter((s) => s.status.startsWith("SUCCESS")).length,
+      failedStores: allStoreEntries.filter((s) => s.status.startsWith("FAILED")).length,
+    },
+    stores: allStoreEntries,
   };
 }
 
