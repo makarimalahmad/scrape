@@ -5,6 +5,7 @@ const { validateScrapeResults } = require("./validate-results");
 const {
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
+  defaultTaxCalculator,
   isMainStoreUrl,
   normalizeHostname,
 } = require("./compare-google-config");
@@ -431,11 +432,11 @@ module.exports = {
   classifyTopUpCompetitorResult,
   scrapeStore,
   createPairRows,
-  exportComparisonFiles,
 
   // Metadata & Configs
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
+  defaultTaxCalculator,
   isMainStoreUrl,
   normalizeHostname,
 

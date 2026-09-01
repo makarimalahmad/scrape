@@ -80,9 +80,28 @@ function isMainStoreUrl(url) {
   );
 }
 
+/**
+ * Default built-in tax calculator arrow function for standard Indonesian top-up stores.
+ * Applies 11% PPN to stores displaying pre-tax catalog prices (e.g. Codashop direct game top-up).
+ * @param {Object} context
+ * @param {string} [context.hostname]
+ * @param {string} [context.productName]
+ * @param {number} context.rawPrice
+ * @returns {number}
+ */
+const defaultTaxCalculator = ({ hostname = "", productName = "", rawPrice = 0 }) => {
+  const isPreTaxStore = hostname.includes("codashop.com");
+  const isExcluded = /gift[_-]?card|roblox/i.test(productName || "");
+  if (isPreTaxStore && !isExcluded) {
+    return Math.round(rawPrice * 1.11);
+  }
+  return rawPrice;
+};
+
 module.exports = {
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
+  defaultTaxCalculator,
   isMainStoreUrl,
   normalizeHostname,
 };
