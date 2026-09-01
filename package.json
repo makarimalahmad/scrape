@@ -1,7 +1,7 @@
 {
   "name": "@makarimalahmad/price-scraper-sdk",
   "version": "1.0.3",
-  "description": "SDK Scraper & Price Comparison Engine for Mobile Legends, Free Fire, and Roblox",
+  "description": "Scraper harga voucher game Mobile Legends, Free Fire, dan Roblox berbasis pencarian Google Organik",
   "main": "index.js",
   "scripts": {
     "scrape": "node scrape.js",

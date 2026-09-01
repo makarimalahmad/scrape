@@ -1,6 +1,6 @@
 # @makarimalahmad/price-scraper-sdk
 
-Node.js Scraper & Price Comparison Engine untuk voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**) berbasis pencarian Google Organik (SerpAPI), dilengkapi normalisasi produk cerdas, AI Fallback extractor (Groq), dan ekspor otomatis ke Excel (.xlsx) serta CSV.
+Scraper harga voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**) berbasis pencarian Google Organik (SerpAPI) dengan ekspor ke format Excel (.xlsx) dan CSV.
 
 ---
 
