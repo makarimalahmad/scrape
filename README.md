@@ -87,38 +87,25 @@ main();
 ```
 
 ### 3. Kustomisasi Pajak / Biaya Toko (`calculateTax`)
+Secara *default*, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dari website toko. Anda dapat menyertakan fungsi `calculateTax` untuk menyesuaikan harga atau menambahkan PPN/biaya admin pada toko tertentu:
 
-#### A. Menggunakan Fungsi Panah Bawaan SDK (`defaultTaxCalculator`):
-```javascript
-const { compareGame, defaultTaxCalculator } = require("@makarimalahmad/price-scraper-sdk");
-
-async function main() {
-  // Menggunakan aturan pajak bawaan resmi (Codashop direct top-up +11% PPN):
-  const result = await compareGame("free-fire", {
-    limit: 5,
-    calculateTax: defaultTaxCalculator,
-  });
-}
-
-main();
-```
-
-#### B. Menulis Fungsi Panah Kustom Sendiri:
 ```javascript
 const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
-  const result = await compareGame("roblox", {
+  const result = await compareGame("free-fire", {
     limit: 5,
-    // Fungsi panah custom buatan Tim IT:
     calculateTax: ({ hostname, rawPrice }) => {
-      const tokoPPN11 = ["codashop.com", "unipin.com"];
-      if (tokoPPN11.some((toko) => hostname.includes(toko))) {
+      // Contoh: menambahkan PPN 11% untuk toko tertentu
+      const preTaxStores = ["codashop.com", "unipin.com"];
+      if (preTaxStores.some((store) => hostname.includes(store))) {
         return Math.round(rawPrice * 1.11);
       }
       return rawPrice;
     },
   });
+
+  console.log("Daftar Toko:", result.stores);
 }
 
 main();

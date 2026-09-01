@@ -80,44 +80,9 @@ function isMainStoreUrl(url) {
   );
 }
 
-/**
- * Tabel aturan pajak PPN dan biaya bawaan untuk toko top-up di Indonesia.
- * Sangat mudah dibaca, ditambah, atau disesuaikan.
- */
-const DEFAULT_TAX_RULES = [
-  {
-    stores: ["codashop.com"],             // Daftar toko yang menampilkan harga sebelum PPN
-    taxRate: 0.11,                        // Tarif PPN 11%
-    exclude: /gift[_-]?card|roblox/i,     // Pengecualian (Roblox Gift Card sudah harga nett)
-  },
-];
-
-/**
- * Fungsi panah bawaan SDK untuk menghitung pajak berdasarkan DEFAULT_TAX_RULES.
- * @param {Object} context
- * @param {string} [context.hostname]
- * @param {string} [context.productName]
- * @param {number} context.rawPrice
- * @returns {number}
- */
-const defaultTaxCalculator = ({ hostname = "", productName = "", rawPrice = 0 }) => {
-  for (const rule of DEFAULT_TAX_RULES) {
-    const isStoreMatch = rule.stores.some((store) => hostname.includes(store));
-    const isExcluded = rule.exclude && rule.exclude.test(productName);
-
-    if (isStoreMatch && !isExcluded) {
-      return Math.round(rawPrice * (1 + rule.taxRate));
-    }
-  }
-
-  return rawPrice;
-};
-
 module.exports = {
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
-  DEFAULT_TAX_RULES,
-  defaultTaxCalculator,
   isMainStoreUrl,
   normalizeHostname,
 };

@@ -5,8 +5,6 @@ const { validateScrapeResults } = require("./validate-results");
 const {
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
-  DEFAULT_TAX_RULES,
-  defaultTaxCalculator,
   isMainStoreUrl,
   normalizeHostname,
 } = require("./compare-google-config");
@@ -437,8 +435,6 @@ module.exports = {
   // Metadata & Configs
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
-  DEFAULT_TAX_RULES,
-  defaultTaxCalculator,
   isMainStoreUrl,
   normalizeHostname,
 
