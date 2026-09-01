@@ -56,11 +56,38 @@ async function scrapeUrl(url, options = {}) {
       options.gameId || null,
     );
 
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname;
+    const calculateTax = options.calculateTax;
+
     const products = rawRows.map((r) => {
-      const numPrice = Number(String(r.Harga || "").replace(/[^\d]/g, "")) || 0;
+      let numPrice = Number(String(r.Harga || "").replace(/[^\d]/g, "")) || 0;
+      let displayPrice = r.Harga;
+      if (typeof calculateTax === "function") {
+        try {
+          const adjusted = calculateTax({
+            rawPrice: numPrice,
+            productName: r.Produk,
+            rawProduct: r.Produk,
+            hostname,
+            url,
+            game: options.gameId || null,
+          });
+          if (
+            typeof adjusted === "number" &&
+            !Number.isNaN(adjusted) &&
+            adjusted >= 0
+          ) {
+            numPrice = Math.round(adjusted);
+            displayPrice = `Rp ${numPrice.toLocaleString("id-ID")}`;
+          }
+        } catch {
+          // Abaikan error fungsi kustom
+        }
+      }
       return {
         name: r.Produk,
-        price: r.Harga,
+        price: displayPrice,
         rawPrice: numPrice,
       };
     });
@@ -91,6 +118,8 @@ async function scrapeUrl(url, options = {}) {
       count: 0,
       confidence: 0,
       status: "FAILED",
+      usedAiFallback: false,
+      extractionMethod: "failed",
       error: error.message,
     };
   }
@@ -124,6 +153,7 @@ function createPairRows(gameConfig, mainStore, competitor) {
  * @param {Object} [options]
  * @param {string} [options.game="mobile-legends"] - Game ID for parsing
  * @param {string} [options.exportCsvPath] - Optional file path to export comparison CSV
+ * @param {Function} [options.calculateTax] - Optional lambda arrow function to transform/adjust tax
  * @returns {Promise<Object>} Comparison result between the two URLs
  */
 async function compareUrls(mainUrl, competitorUrl, options = {}) {
@@ -133,22 +163,37 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
     scrapeUrl(competitorUrl, options),
   ]);
 
+  const mainHostname = new URL(mainUrl).hostname;
+  const competitorHostname = new URL(competitorUrl).hostname;
+
   const mainParsed = selectCheapestProducts(
     mainResult.products.map((p) => ({ Produk: p.name, Harga: p.price })),
     game,
+    {
+      hostname: mainHostname,
+      url: mainUrl,
+      store: mainHostname.replace(/^www\./, ""),
+      calculateTax: options.calculateTax,
+    },
   );
   const competitorParsed = selectCheapestProducts(
     competitorResult.products.map((p) => ({ Produk: p.name, Harga: p.price })),
     game,
+    {
+      hostname: competitorHostname,
+      url: competitorUrl,
+      store: competitorHostname.replace(/^www\./, ""),
+      calculateTax: options.calculateTax,
+    },
   );
 
   const mainStore = {
-    name: new URL(mainUrl).hostname.replace(/^www\./, ""),
+    name: mainHostname.replace(/^www\./, ""),
     url: mainUrl,
     products: mainParsed,
   };
   const competitorStore = {
-    name: new URL(competitorUrl).hostname.replace(/^www\./, ""),
+    name: competitorHostname.replace(/^www\./, ""),
     url: competitorUrl,
     position: 1,
     products: competitorParsed,
@@ -184,6 +229,7 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * @param {number} [options.maxAttempts=3] - Retry attempts per store
  * @param {boolean} [options.headed=false] - Run headed browser
  * @param {string} [options.exportXlsxDirectory] - Optional folder to export styled Excel (.xlsx) file
+ * @param {Function} [options.calculateTax] - Optional lambda arrow function to transform/adjust tax per store
  * @returns {Promise<Object>} Structured comparison data with anchors and store pricing
  */
 async function compareGame(gameId, options = {}) {
@@ -223,6 +269,7 @@ async function compareGame(gameId, options = {}) {
           headed,
           maxAttempts,
           retryDelayMultiplier: 1,
+          calculateTax: options.calculateTax,
         });
         allStores.push(storeResult);
       } catch (err) {
@@ -247,6 +294,7 @@ async function compareGame(gameId, options = {}) {
             headed,
             maxAttempts,
             retryDelayMultiplier: 1,
+            calculateTax: options.calculateTax,
           });
         } catch (err) {
           return {

@@ -1124,12 +1124,6 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     pathname.includes("gift-card") ||
     /roblox|gift[_-]?cards?/i.test(pathname);
 
-  const isTaxExcluded =
-    (hostname.endsWith("codashop.com") && !isGiftCardOrRoblox) ||
-    /pajak akan dikenakan|belum termasuk (?:pajak|ppn)|sebelum pajak|excl(?:ude)?\.?\s*tax/i.test(
-      document.body?.innerText || "",
-    );
-
   const pushRow = (product, harga) => {
     let cleanProduct = clean(product);
     let cleanHarga = clean(harga);
@@ -1147,16 +1141,6 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
       if (/^(?:IDR|USD|\$)\s*[\d.]+/i.test(cleanProduct)) {
         cleanProduct = `Roblox ${cleanProduct}`;
       }
-    }
-
-    // Normalisasi Pajak (PPN 11%): Menyesuaikan harga display sebelum pajak menjadi harga final
-    if (isTaxExcluded) {
-      const rawNumber = Number(digits);
-      const withTax = Math.round(rawNumber * 1.11);
-      cleanHarga = cleanHarga.replace(
-        /\d[\d.,]*/,
-        withTax.toLocaleString("id-ID"),
-      );
     }
 
     const key = `${cleanProduct.toLowerCase()}|${cleanHarga.toLowerCase()}`;

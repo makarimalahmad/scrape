@@ -86,6 +86,26 @@ async function main() {
 main();
 ```
 
+### 3. Kustomisasi Pajak / Biaya Toko (`calculateTax`)
+```javascript
+const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
+
+async function main() {
+  const result = await compareGame("free-fire", {
+    limit: 5,
+    // Fungsi lambda panah untuk menyesuaikan harga/PPN per toko:
+    calculateTax: ({ hostname, rawPrice }) => {
+      if (hostname.includes("codashop.com")) {
+        return Math.round(rawPrice * 1.11); // Tambah PPN 11% untuk Codashop
+      }
+      return rawPrice; // Toko lain tetap harga normal
+    },
+  });
+}
+
+main();
+```
+
 ---
 
 ## 📖 Referensi Parameter
@@ -108,6 +128,7 @@ main();
 | `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika timeout (1–5). |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
+| `calculateTax` | `function` | `null` | Fungsi lambda panah untuk menyesuaikan harga/pajak toko tertentu (contoh: `({ hostname, rawPrice }) => hostname.includes("coda") ? rawPrice * 1.11 : rawPrice`). |
 
 ### 3. Parameter SDK (`scrapeUrl`)
 | Opsi | Tipe | Default | Keterangan |
@@ -115,6 +136,7 @@ main();
 | `url` | `string` | **Wajib** | URL halaman toko target yang akan diekstrak. |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportCsvPath` | `string` | `null` | Path file tujuan untuk menyimpan hasil ke CSV. |
+| `calculateTax` | `function` | `null` | Fungsi lambda panah untuk transformasi harga/pajak custom. |
 
 ---
 

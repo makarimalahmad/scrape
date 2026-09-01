@@ -169,13 +169,39 @@ function parseProduct(name, game) {
   return { key, category: "other", quantity: null, unit: null };
 }
 
-function selectCheapestProducts(rows, game) {
+function selectCheapestProducts(rows, game, options = {}) {
   const products = new Map();
+  const calculateTax =
+    typeof options === "function" ? options : options.calculateTax;
 
   for (const row of rows) {
     const parsed = parseProduct(row.Produk, game);
-    const price = parsePrice(row.Harga);
+    let price = parsePrice(row.Harga);
     if (!parsed.key || parsed.category === "other" || price === null) continue;
+
+    if (typeof calculateTax === "function") {
+      try {
+        const adjusted = calculateTax({
+          rawPrice: price,
+          productName: row.Produk,
+          rawProduct: row.Produk,
+          parsedProduct: parsed,
+          store: options.store || options.name || "",
+          hostname: options.hostname || "",
+          url: options.url || "",
+          game,
+        });
+        if (
+          typeof adjusted === "number" &&
+          !Number.isNaN(adjusted) &&
+          adjusted >= 0
+        ) {
+          price = Math.round(adjusted);
+        }
+      } catch {
+        // Abaikan error pada fungsi kustom dan tetap gunakan harga mentah
+      }
+    }
 
     const mapKey = `${parsed.category}|${parsed.key}`;
     const current = products.get(mapKey);

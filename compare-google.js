@@ -388,7 +388,12 @@ async function scrapeStore(store, gameConfig, options) {
     reason: usedAiFallback
       ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
       : null,
-    products: selectCheapestProducts(allRows, gameConfig.id),
+    products: selectCheapestProducts(allRows, gameConfig.id, {
+      store: store.name || store.store,
+      hostname: primaryUrl.hostname,
+      url: primaryUrl.href,
+      calculateTax: options.calculateTax,
+    }),
   };
 }
 
