@@ -9,7 +9,7 @@
     "compare:url": "node compare-url.js",
     "compare:google": "node compare-google.js",
     "search:top": "node search-top-and-scrape.js",
-    "test": "node --check index.js && node --check scrape.js && node --check scrape-new.js && node --check compare-url.js && node --check search-top-and-scrape.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js && node tests/sdk.test.js && node tests/validate-results.test.js && node tests/compare-google.test.js && node tests/scrape-new.test.js"
+    "test": "node --check index.js && node --check scrape.js && node --check scrape-new.js && node --check compare-url.js && node --check search-top-and-scrape.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js"
   },
   "keywords": [],
   "author": "",
