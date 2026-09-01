@@ -23,7 +23,6 @@ npx playwright install chromium
 ## 🖥️ Penggunaan via CLI / Terminal
 
 ### 1. Komparasi Multi-Store Google & Ekspor Excel (Utama)
-Menjalankan pencarian kompetitor organik Google, scraping toko utama (UPoint & DuniaGames) dan kompetitor, lalu mengekspor hasil ke format Excel (.xlsx):
 ```bash
 # Komparasi game tertentu
 node scrape-new.js --game roblox
@@ -38,7 +37,6 @@ node scrape-new.js --game roblox --limit 10 --attempts 3 --concurrency 3 --heade
 ```
 
 ### 2. Scrape Cepat 1 URL Toko
-Mengambil daftar harga dan produk langsung dari 1 link toko:
 ```bash
 node scrape.js "https://garudaku.com/gstore/roblox"
 ```
@@ -58,9 +56,9 @@ const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
   const result = await compareGame("roblox", {
-    limit: 5,                          // Jumlah kompetitor Google (default: 10)
-    concurrency: 2,                     // Browser paralel (default: 3)
-    exportXlsxDirectory: "./laporan",   // Folder output file Excel
+    limit: 5,
+    concurrency: 2,
+    exportXlsxDirectory: "./laporan",
   });
 
   console.log("Game:", result.game);
@@ -70,16 +68,6 @@ async function main() {
 
 main();
 ```
-
-| Opsi | Tipe | Default | Keterangan |
-| :--- | :---: | :---: | :--- |
-| `limit` | `number` | `10` | Jumlah toko kompetitor Google yang diambil (1–10). |
-| `concurrency` | `number` | `3` | Jumlah browser paralel yang berjalan bersamaan (1–4). |
-| `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika terjadi kendala jaringan (1–5). |
-| `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika bernilai `true`. |
-| `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
-
----
 
 ### 2. `scrapeUrl(url, [options])`
 ```javascript
@@ -98,10 +86,35 @@ async function main() {
 main();
 ```
 
+---
+
+## 📖 Referensi Parameter
+
+### 1. Parameter CLI (`scrape-new.js`)
+| Parameter | Default | Keterangan |
+| :--- | :---: | :--- |
+| `--game` | **Wajib** | Pilihan game: `all`, `mobile-legends`, `free-fire`, atau `roblox`. |
+| `--limit` | `10` | Jumlah toko kompetitor Google yang diambil (1–10). |
+| `--attempts` | `3` | Batas percobaan ulang (*retry*) per toko jika terjadi kendala jaringan (1–5). |
+| `--concurrency` | `3` | Jumlah browser paralel yang berjalan bersamaan (1–4). |
+| `--headed` | `false` | Menampilkan jendela visual browser jika disertakan. |
+
+### 2. Parameter SDK (`compareGame`)
 | Opsi | Tipe | Default | Keterangan |
 | :--- | :---: | :---: | :--- |
-| `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika bernilai `true`. |
-| `exportCsvPath` | `string` | `null` | Path file tujuan untuk menyimpan hasil langsung ke format CSV. |
+| `gameId` | `string` | **Wajib** | ID game: `"mobile-legends"`, `"free-fire"`, atau `"roblox"`. |
+| `limit` | `number` | `10` | Jumlah toko kompetitor Google yang diambil (1–10). |
+| `concurrency` | `number` | `3` | Jumlah browser paralel yang berjalan bersamaan (1–4). |
+| `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika timeout (1–5). |
+| `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
+| `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
+
+### 3. Parameter SDK (`scrapeUrl`)
+| Opsi | Tipe | Default | Keterangan |
+| :--- | :---: | :---: | :--- |
+| `url` | `string` | **Wajib** | URL halaman toko target yang akan diekstrak. |
+| `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
+| `exportCsvPath` | `string` | `null` | Path file tujuan untuk menyimpan hasil ke CSV. |
 
 ---
 
