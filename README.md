@@ -68,18 +68,37 @@ async function main() {
 main();
 ```
 
+| Opsi | Tipe | Default | Keterangan |
+| :--- | :---: | :---: | :--- |
+| `limit` | `number` | `10` | Jumlah toko kompetitor Google yang diambil (1–10). |
+| `concurrency` | `number` | `3` | Jumlah browser paralel yang berjalan bersamaan (1–4). |
+| `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika terjadi kendala jaringan (1–5). |
+| `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika bernilai `true`. |
+| `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
+
+---
+
 ### 2. `scrapeUrl(url, [options])`
 ```javascript
 const { scrapeUrl } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
-  const result = await scrapeUrl("https://garudaku.com/gstore/roblox");
+  const result = await scrapeUrl("https://garudaku.com/gstore/roblox", {
+    headed: false,
+    exportCsvPath: "./data.csv",
+  });
+
   console.log("Status:", result.success);
   console.log("Produk:", result.products);
 }
 
 main();
 ```
+
+| Opsi | Tipe | Default | Keterangan |
+| :--- | :---: | :---: | :--- |
+| `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika bernilai `true`. |
+| `exportCsvPath` | `string` | `null` | Path file tujuan untuk menyimpan hasil langsung ke format CSV. |
 
 ---
 
