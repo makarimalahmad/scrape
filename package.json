@@ -5,10 +5,9 @@
   "main": "index.js",
   "scripts": {
     "scrape": "node scrape.js",
-    "scrape:new": "node scrape-new.js",
+    "compare:game": "node compare-game.js",
     "compare:url": "node compare-url.js",
-    "compare:google": "node compare-google.js",
-    "test": "node --check index.js && node --check scrape.js && node --check scrape-new.js && node --check compare-url.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js"
+    "test": "node --check index.js && node --check scrape.js && node --check compare-game.js && node --check compare-url.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js"
   },
   "keywords": [],
   "author": "",

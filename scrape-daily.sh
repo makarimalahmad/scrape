@@ -29,7 +29,7 @@ echo "===== Scrape mulai $(date --iso-8601=seconds) ====="
   -a \
   -s "-screen 0 1920x1080x24" \
   /usr/bin/node \
-  scrape-new.js \
+  compare-game.js \
   --game "$GAME" \
   --attempts "$ATTEMPTS" \
   --limit "$LIMIT" \

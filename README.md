@@ -25,15 +25,15 @@ npx playwright install chromium
 ### 1. Komparasi Multi-Store Google & Ekspor Excel (Utama)
 ```bash
 # Komparasi game tertentu
-node scrape-new.js --game roblox
-node scrape-new.js --game free-fire
-node scrape-new.js --game mobile-legends
+node compare-game.js --game roblox
+node compare-game.js --game free-fire
+node compare-game.js --game mobile-legends
 
 # Komparasi seluruh game sekaligus
-node scrape-new.js --game all
+node compare-game.js --game all
 
 # Opsi tambahan (opsional)
-node scrape-new.js --game roblox --limit 10 --attempts 3 --concurrency 3 --headed
+node compare-game.js --game roblox --limit 10 --attempts 3 --concurrency 3 --headed
 ```
 
 ### 2. Scrape Cepat 1 URL Toko
@@ -90,7 +90,7 @@ main();
 
 ## 📖 Referensi Parameter
 
-### 1. Parameter CLI (`scrape-new.js`)
+### 1. Parameter CLI (`compare-game.js`)
 | Parameter | Default | Keterangan |
 | :--- | :---: | :--- |
 | `--game` | **Wajib** | Pilihan game: `all`, `mobile-legends`, `free-fire`, atau `roblox`. |

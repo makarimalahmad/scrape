@@ -14,8 +14,6 @@ const {
   selectGoogleCompetitors,
   classifyTopUpCompetitorResult,
   mapWithConcurrency,
-  createPairRows,
-  exportComparisonFiles,
 } = require("./compare-google");
 const {
   createScrapeRows,
@@ -25,7 +23,7 @@ const {
   calculateComparison,
   selectBenchmark,
   exportScrapeXlsx,
-} = require("./scrape-new");
+} = require("./compare-game");
 const {
   findMatches,
   parseProduct,
@@ -96,6 +94,27 @@ async function scrapeUrl(url, options = {}) {
       error: error.message,
     };
   }
+}
+
+function createPairRows(gameConfig, mainStore, competitor) {
+  const rows = [];
+  for (const mainProduct of mainStore.products.values()) {
+    const matches = findMatches(mainProduct, competitor.products);
+    if (!matches.length) continue;
+    const competitorProduct = matches[0].product;
+    const difference = mainProduct.price - competitorProduct.price;
+    rows.push({
+      Game: gameConfig.name || gameConfig,
+      "Produk Utama": mainProduct.rawName,
+      "Harga Utama": mainProduct.price,
+      "Produk Pembanding": competitorProduct.rawName,
+      "Harga Pembanding": competitorProduct.price,
+      "Selisih Harga": difference,
+      "Store Utama": mainStore.name,
+      "Store Pembanding": competitor.name,
+    });
+  }
+  return rows;
 }
 
 /**
