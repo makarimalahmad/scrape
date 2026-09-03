@@ -136,6 +136,8 @@ function createScrapeRows(gameConfig, ranking, mainStores, competitors) {
     const duniaGamesHighest = calculateComparison(duniaGames, highest);
     const row = {
       Produk: anchor.reference.key,
+      UPoint: upoint?.price ?? "-",
+      DuniaGames: duniaGames?.price ?? "-",
     };
 
     for (const rankedStore of ranking) {
@@ -341,6 +343,29 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
       }
     }
   }
+
+  // ============================================================================
+  // KETERANGAN / LEGENDA WARNA
+  // ============================================================================
+  const legendRowIdx = worksheet.rowCount + 2;
+  const legendLabelCell = worksheet.getCell(legendRowIdx, 1);
+  legendLabelCell.value = "Keterangan Warna:";
+  legendLabelCell.font = { bold: true, italic: true, size: 10 };
+  legendLabelCell.alignment = { vertical: "middle", horizontal: "left" };
+
+  const lowestLegendCell = worksheet.getCell(legendRowIdx, competitorStart);
+  lowestLegendCell.value = "Harga Terendah";
+  lowestLegendCell.fill = lowestFill;
+  lowestLegendCell.font = lowestFont;
+  lowestLegendCell.border = border;
+  lowestLegendCell.alignment = { vertical: "middle", horizontal: "center" };
+
+  const highestLegendCell = worksheet.getCell(legendRowIdx, competitorStart + 1);
+  highestLegendCell.value = "Harga Tertinggi";
+  highestLegendCell.fill = highestFill;
+  highestLegendCell.font = highestFont;
+  highestLegendCell.border = border;
+  highestLegendCell.alignment = { vertical: "middle", horizontal: "center" };
 
   return { workbook, worksheet };
 }
