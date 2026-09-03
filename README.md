@@ -87,8 +87,15 @@ main();
 ```
 
 ### 3. Kustomisasi Pajak / Biaya Toko (`calculateTax`)
-Secara *default*, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dari website toko. Anda dapat menyertakan fungsi `calculateTax` untuk menyesuaikan harga atau menambahkan PPN/biaya admin pada toko tertentu:
+Secara *default*, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dari website toko. Anda dapat menyertakan fungsi `calculateTax` untuk menyesuaikan harga atau menambahkan PPN/biaya admin pada toko tertentu.
 
+Fungsi `calculateTax` menerima parameter objek:
+* `hostname` *(string)*: Domain toko target (misal: `"codashop.com"`).
+* `rawPrice` *(number)*: Harga nominal asli sebelum penyesuaian (misal: `20000`).
+* `productName` *(string)*: Nama produk yang diekstrak (misal: `"140 Diamonds"`).
+* `game` *(string)*: ID game yang sedang diproses (`"mobile-legends"`, `"free-fire"`, atau `"roblox"`).
+
+#### Contoh Implementasi (Mendukung Multi-Toko & Multi-Tarif):
 ```javascript
 const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
@@ -96,16 +103,25 @@ async function main() {
   const result = await compareGame("free-fire", {
     limit: 5,
     calculateTax: ({ hostname, rawPrice }) => {
-      // Contoh: menambahkan PPN 11% untuk toko tertentu
-      const preTaxStores = ["codashop.com", "unipin.com"];
-      if (preTaxStores.some((store) => hostname.includes(store))) {
+      // Kelompok toko dengan PPN 11%
+      const tokoPPN11 = ["codashop.com", "unipin.com"];
+      if (tokoPPN11.some((store) => hostname.includes(store))) {
         return Math.round(rawPrice * 1.11);
       }
+
+      // Kelompok toko dengan biaya admin 2%
+      const tokoAdmin2 = ["lapakgaming.com"];
+      if (tokoAdmin2.some((store) => hostname.includes(store))) {
+        return Math.round(rawPrice * 1.02);
+      }
+
+      // Toko lainnya tetap harga normal
       return rawPrice;
     },
   });
 
   console.log("Daftar Toko:", result.stores);
+  console.log("File Laporan:", result.xlsxFilePath);
 }
 
 main();
@@ -133,7 +149,7 @@ main();
 | `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika timeout (1–5). |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
-| `calculateTax` | `function` | `null` | Fungsi lambda panah untuk menyesuaikan harga/pajak toko tertentu (contoh: `({ hostname, rawPrice }) => hostname.includes("coda") ? rawPrice * 1.11 : rawPrice`). |
+| `calculateTax` | `function` | `null` | Fungsi callback kustom untuk mengatur PPN/biaya per toko (menerima `{ hostname, rawPrice, productName, game }`). |
 
 ### 3. Parameter SDK (`scrapeUrl`)
 | Opsi | Tipe | Default | Keterangan |
@@ -141,7 +157,7 @@ main();
 | `url` | `string` | **Wajib** | URL halaman toko target yang akan diekstrak. |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportCsvPath` | `string` | `null` | Path file tujuan untuk menyimpan hasil ke CSV. |
-| `calculateTax` | `function` | `null` | Fungsi lambda panah untuk transformasi harga/pajak custom. |
+| `calculateTax` | `function` | `null` | Fungsi callback kustom untuk mengatur PPN/biaya toko target. |
 
 ---
 
