@@ -7,7 +7,7 @@
     "scrape": "node scrape.js",
     "compare:game": "node compare-game.js",
     "compare:url": "node compare-url.js",
-    "test": "node --check index.js && node --check scrape.js && node --check compare-game.js && node --check compare-url.js && node --check validate-results.js && node --check product-matcher.js && node --check compare-google-config.js && node --check compare-google.js"
+    "test": "node --check index.js && node --check scrape.js && node --check compare-game.js && node --check compare-url.js && node --check lib/google/google-search.js && node --check lib/browser/playwright.js && node --check lib/config/game-config.js && node --check lib/proxy/proxy-manager.js && node --check lib/anti-bot/cloudflare.js && node --check lib/anti-bot/real-browser.js && node --check lib/extractors/parsers.js && node --check lib/extractors/special-extractors.js && node --check lib/extractors/generic-extractor.js && node --check lib/extractors/ai-extractor.js && node --check lib/matcher/product-matcher.js && node --check lib/validation/validate-results.js && node --check lib/utils/export-csv.js"
   },
   "keywords": [],
   "author": "",

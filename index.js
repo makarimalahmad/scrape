@@ -1,20 +1,20 @@
 require("dotenv").config({ quiet: true });
-const { chromium } = require("./playwright");
+const { chromium } = require("./lib/browser/playwright");
 const { scrape, exportCsv, saveInvalidReport } = require("./scrape");
-const { validateScrapeResults } = require("./validate-results");
+const { validateScrapeResults } = require("./lib/validation/validate-results");
 const {
   GAME_CONFIGS,
   MAIN_STORE_DOMAINS,
   isMainStoreUrl,
   normalizeHostname,
-} = require("./compare-google-config");
+} = require("./lib/config/game-config");
 const {
   searchGoogle,
   scrapeStore,
   selectGoogleCompetitors,
   classifyTopUpCompetitorResult,
   mapWithConcurrency,
-} = require("./compare-google");
+} = require("./lib/google/google-search");
 const {
   createScrapeRows,
   createProductAnchors,
@@ -29,8 +29,8 @@ const {
   parseProduct,
   parsePrice,
   selectCheapestProducts,
-} = require("./product-matcher");
-const { extractWithGroq } = require("./ai-extractor");
+} = require("./lib/matcher/product-matcher");
+const { extractWithGroq } = require("./lib/extractors/ai-extractor");
 
 /**
  * Scrape price data from a single store URL.
@@ -40,6 +40,7 @@ const { extractWithGroq } = require("./ai-extractor");
  * @param {boolean} [options.headed=false] - Run with visible browser
  * @param {string} [options.gameId] - Optional game ID for domain validation
  * @param {string} [options.exportCsvPath] - Optional path to export CSV
+ * @param {string|Object} [options.proxy] - Optional proxy URL string (host:port:user:pass or http://...) or proxy object
  * @returns {Promise<{ success: boolean, url: string, products: Array<{ name: string, price: string, rawPrice: number }>, count: number, confidence: number, status: string, error?: string, csvPath?: string, reasons?: string[] }>}
  */
 async function scrapeUrl(url, options = {}) {
@@ -230,6 +231,7 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * @param {boolean} [options.headed=false] - Run headed browser
  * @param {string} [options.exportXlsxDirectory] - Optional folder to export styled Excel (.xlsx) file
  * @param {Function} [options.calculateTax] - Optional lambda arrow function to transform/adjust tax per store
+ * @param {string|Object} [options.proxy] - Optional proxy URL string (host:port:user:pass or http://...) or proxy object
  * @returns {Promise<Object>} Structured comparison data with anchors and store pricing
  */
 async function compareGame(gameId, options = {}) {
@@ -270,6 +272,7 @@ async function compareGame(gameId, options = {}) {
           maxAttempts,
           retryDelayMultiplier: 1,
           calculateTax: options.calculateTax,
+          proxy: options.proxy,
         });
         allStores.push(storeResult);
       } catch (err) {
@@ -295,6 +298,7 @@ async function compareGame(gameId, options = {}) {
             maxAttempts,
             retryDelayMultiplier: 1,
             calculateTax: options.calculateTax,
+            proxy: options.proxy,
           });
         } catch (err) {
           return {

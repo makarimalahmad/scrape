@@ -2,16 +2,16 @@ require("dotenv").config({ quiet: true });
 const fs = require("fs");
 const path = require("path");
 const ExcelJS = require("exceljs");
-const { chromium } = require("./playwright");
+const { chromium } = require("./lib/browser/playwright");
 const { exportCsv } = require("./scrape");
-const { GAME_CONFIGS } = require("./compare-google-config");
+const { GAME_CONFIGS } = require("./lib/config/game-config");
 const {
   createUniqueRunDirectory,
   mapWithConcurrency,
   scrapeStore,
   searchGoogle,
-} = require("./compare-google");
-const { findMatches } = require("./product-matcher");
+} = require("./lib/google/google-search");
+const { findMatches } = require("./lib/matcher/product-matcher");
 
 function getArgument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);

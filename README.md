@@ -11,6 +11,7 @@ Buat file `.env` di root direktori:
 ```env
 SERPAPI_KEY=your_serpapi_key_here
 GROQ_API_KEY=your_groq_api_key_here  # Opsional: untuk AI fallback jika DOM tidak lengkap
+PROXY_URL=http://user:pass@host:port # Opsional: jika ada toko yang memblokir IP Datacenter VPS (misal Bangjeff)
 ```
 
 ### 2. Install Playwright Chromium
@@ -192,6 +193,7 @@ main();
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
 | `calculateTax` | `function` | `null` | Fungsi callback kustom untuk mengatur PPN/biaya per toko (menerima `{ hostname, rawPrice, productName, game }`). |
+| `proxy` | `string` / `object` | `null` | Konfigurasi proxy opsional (`host:port:user:pass` atau `http://...`). |
 
 ### 3. Parameter SDK (`scrapeUrl`)
 | Opsi | Tipe | Default | Keterangan |
@@ -200,6 +202,7 @@ main();
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportCsvPath` | `string` | `null` | Path file tujuan untuk menyimpan hasil ke CSV. |
 | `calculateTax` | `function` | `null` | Fungsi callback kustom untuk mengatur PPN/biaya toko target. |
+| `proxy` | `string` / `object` | `null` | Konfigurasi proxy opsional (`host:port:user:pass` atau `http://...`). |
 
 ---
 
@@ -216,8 +219,47 @@ Setiap toko di `summary-scrape.json` dan SDK memiliki status terstandarisasi:
 
 ---
 
+## 📁 Struktur Proyek & Arsitektur Direktori
+
+```text
+price-scraper/
+├── lib/                             # Core internal modules terorganisir
+│   ├── anti-bot/                    # Bypass Cloudflare Turnstile & Real Browser
+│   │   ├── cloudflare.js
+│   │   └── real-browser.js
+│   ├── browser/                     # Playwright Chromium & Stealth configuration
+│   │   └── playwright.js
+│   ├── config/                      # Konfigurasi game & toko utama (UPoint/DuniaGames)
+│   │   └── game-config.js
+│   ├── extractors/                  # Ekstraktor harga game
+│   │   ├── ai-extractor.js          # Groq AI LLM extraction fallback
+│   │   ├── generic-extractor.js     # Universal fallback JSON/DOM extractor
+│   │   ├── parsers.js               # Parser teks kartu/opsi produk
+│   │   └── special-extractors.js    # 15+ ekstraktor khusus toko besar (Tokopedia, Shopee, Blibli, dll)
+│   ├── google/                      # SerpAPI search & koordinasi kompetitor Google
+│   │   └── google-search.js
+│   ├── matcher/                     # Mesin normalisasi & pencocokan produk kompetitor
+│   │   └── product-matcher.js
+│   ├── proxy/                       # Smart proxy manager & fallback
+│   │   └── proxy-manager.js
+│   ├── utils/                       # Utilitas ekspor CSV & laporan error
+│   │   └── export-csv.js
+│   └── validation/                  # Validasi kualitas scrape & confidence score
+│       └── validate-results.js
+├── index.js                         # Public SDK Facade (@makarimalahmad/price-scraper-sdk)
+├── compare-game.js                  # CLI runner: komparasi game Google & ekspor Excel
+├── compare-url.js                   # CLI runner: komparasi 2 URL spesifik
+├── scrape.js                        # CLI runner: scraping single URL
+├── scrape-daily.sh                  # Runner cron harian otomatis di VPS
+├── package.json
+└── README.md
+```
+
+---
+
 ## 🧪 Verifikasi & Uji Script
 
 ```bash
 npm test
 ```
+
