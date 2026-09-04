@@ -11,7 +11,7 @@ Buat file `.env` di root direktori:
 ```env
 SERPAPI_KEY=your_serpapi_key_here
 GROQ_API_KEY=your_groq_api_key_here  # Opsional: untuk AI fallback jika DOM tidak lengkap
-PROXY_URL=http://user:pass@host:port # Opsional: jika ada toko yang memblokir IP Datacenter VPS (misal Bangjeff)
+PROXY_URL=http://user:pass@host:port # Opsional: jika ada toko yang memblokir IP Datacenter VPS
 ```
 
 ### 2. Install Playwright Chromium
@@ -171,9 +171,9 @@ main();
 ```
 
 ### 4. Penggunaan Proxy pada SDK (`proxy`)
-Secara default, jika variabel `PROXY_URL` sudah diset di `.env`, SDK akan otomatis menggunakan proxy tersebut secara cerdas (*smart routing*) hanya untuk toko yang membutuhkannya (seperti Bangjeff).
+Jika variabel `PROXY_URL` diisi di `.env`, proxy otomatis digunakan untuk toko yang membutuhkannya.
 
-Namun, tim lain juga dapat menyertakan parameter `proxy` secara langsung di pemanggilan fungsi tanpa bergantung pada `.env`:
+Selain lewat `.env`, opsi `proxy` juga bisa langsung dimasukkan saat memanggil fungsi:
 
 ```javascript
 const { scrapeUrl, compareGame } = require("@makarimalahmad/price-scraper-sdk");
@@ -262,9 +262,9 @@ price-scraper/
 │   │   └── special-extractors.js    # 15+ ekstraktor khusus toko besar (Tokopedia, Shopee, Blibli, dll)
 │   ├── google/                      # SerpAPI search & koordinasi kompetitor Google
 │   │   └── google-search.js
-│   ├── matcher/                     # Mesin normalisasi & pencocokan produk kompetitor
+│   ├── matcher/                     # Normalisasi & pencocokan produk kompetitor
 │   │   └── product-matcher.js
-│   ├── proxy/                       # Smart proxy manager & fallback
+│   ├── proxy/                       # Pengaturan proxy per toko target
 │   │   └── proxy-manager.js
 │   ├── utils/                       # Utilitas ekspor CSV & laporan error
 │   │   └── export-csv.js
