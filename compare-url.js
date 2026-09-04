@@ -1,7 +1,7 @@
 const path = require("path");
 const readline = require("readline/promises");
 const { DEFAULT_SELECTOR, scrape, validateUrl, exportCsv } = require("./scrape");
-const { selectCheapestProducts, findMatches, parsePrice } = require("./product-matcher");
+const { selectCheapestProducts, findMatches } = require("./product-matcher");
 
 function getFlagValue(name) {
   const index = process.argv.indexOf(`--${name}`);
@@ -137,4 +137,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseProduct, cheapestProducts, findMatches };
+module.exports = {
+  collectInputs,
+  findMatches,
+  getStore,
+  main,
+  scrapeUrl,
+};

@@ -95,27 +95,69 @@ Fungsi `calculateTax` menerima parameter objek:
 * `productName` *(string)*: Nama produk yang diekstrak (misal: `"140 Diamonds"`).
 * `game` *(string)*: ID game yang sedang diproses (`"mobile-legends"`, `"free-fire"`, atau `"roblox"`).
 
-#### Contoh Implementasi (Mendukung Multi-Toko & Multi-Tarif):
+#### Contoh 1: Menerapkan PPN 11% untuk Banyak Toko Sekaligus
+Jika Anda ingin menerapkan penyesuaian PPN 11% ke banyak toko kompetitor secara kolektif:
+
 ```javascript
 const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
+  // Daftar domain toko yang dikenakan PPN 11%
+  const tokoKenaPPN11 = [
+    "codashop.com",
+    "unipin.com",
+    "itemku.com",
+    "lapakgaming.com",
+    "vcgamers.com",
+    "tokopedia.com",
+    "blibli.com",
+    "kiosgamer.co.id",
+  ];
+
   const result = await compareGame("free-fire", {
-    limit: 5,
+    limit: 10,
     calculateTax: ({ hostname, rawPrice }) => {
-      // Kelompok toko dengan PPN 11%
-      const tokoPPN11 = ["codashop.com", "unipin.com"];
+      // Cek apakah hostname toko termasuk dalam daftar toko PPN 11%
+      const kenaPajak = tokoKenaPPN11.some((domain) => hostname.includes(domain));
+      if (kenaPajak) {
+        return Math.round(rawPrice * 1.11);
+      }
+
+      // Toko lainnya (atau toko utama seperti UPoint & DuniaGames) tetap harga normal
+      return rawPrice;
+    },
+  });
+
+  console.log("Daftar Toko:", result.stores);
+  console.log("File Laporan:", result.xlsxFilePath);
+}
+
+main();
+```
+
+#### Contoh 2: Multi-Toko & Multi-Tarif (Kombinasi PPN & Biaya Khusus)
+Jika masing-masing kelompok toko memiliki ketentuan tarif pajak atau biaya layanan yang berbeda:
+
+```javascript
+const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
+
+async function main() {
+  const result = await compareGame("mobile-legends", {
+    limit: 10,
+    calculateTax: ({ hostname, rawPrice }) => {
+      // Kelompok 1: Toko dengan PPN 11%
+      const tokoPPN11 = ["codashop.com", "unipin.com", "itemku.com", "vcgamers.com"];
       if (tokoPPN11.some((store) => hostname.includes(store))) {
         return Math.round(rawPrice * 1.11);
       }
 
-      // Kelompok toko dengan biaya admin 2%
-      const tokoAdmin2 = ["lapakgaming.com"];
+      // Kelompok 2: Toko dengan biaya platform / admin 2%
+      const tokoAdmin2 = ["lapakgaming.com", "tokopedia.com"];
       if (tokoAdmin2.some((store) => hostname.includes(store))) {
         return Math.round(rawPrice * 1.02);
       }
 
-      // Toko lainnya tetap harga normal
+      // Toko lainnya tetap menggunakan harga asli
       return rawPrice;
     },
   });

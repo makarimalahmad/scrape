@@ -1,7 +1,6 @@
 require("dotenv").config({ quiet: true });
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("./playwright");
 const {
   DEFAULT_SELECTOR,
   exportCsv,
@@ -10,12 +9,10 @@ const {
 } = require("./scrape");
 const { validateScrapeResults } = require("./validate-results");
 const {
-  GAME_CONFIGS,
   isMainStoreUrl,
   normalizeHostname,
 } = require("./compare-google-config");
 const {
-  findMatches,
   selectCheapestProducts,
 } = require("./product-matcher");
 
@@ -171,19 +168,6 @@ function selectGoogleCompetitors(results, gameConfig, limit) {
   }
 
   return { ranking, decisions };
-}
-
-function getArgument(name, fallback = null) {
-  const index = process.argv.indexOf(`--${name}`);
-  if (index < 0) return fallback;
-  const value = process.argv[index + 1];
-  return value && !value.startsWith("--") ? value : fallback;
-}
-
-function formatPrice(value) {
-  return value === null || value === undefined
-    ? "-"
-    : `Rp ${Math.round(value).toLocaleString("id-ID")}`;
 }
 
 function sanitizeFileName(value) {

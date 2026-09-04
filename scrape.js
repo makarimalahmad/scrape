@@ -784,6 +784,23 @@ async function pageShowsCloudflareChallenge(page) {
 }
 
 async function clickTurnstileFrame(page, frame) {
+  const frameElement = await frame.frameElement().catch(() => null);
+  const box = await frameElement?.boundingBox().catch(() => null);
+
+  // 1. Simulasikan pergerakan kursor mouse alami ke kotak centang di koordinat fisik
+  if (box && box.width > 0 && box.height > 0) {
+    const targetX = box.x + Math.min(28, box.width / 2);
+    const targetY = box.y + box.height / 2;
+
+    await page.mouse.move(targetX, targetY, { steps: 12 }).catch(() => {});
+    await page.waitForTimeout(150 + Math.random() * 150);
+    await page.mouse.down().catch(() => {});
+    await page.waitForTimeout(75 + Math.random() * 75);
+    await page.mouse.up().catch(() => {});
+    return true;
+  }
+
+  // 2. Fallback: klik target elemen di dalam iframe jika bounding box tidak tersedia
   const targets = [
     frame.locator('input[type="checkbox"]'),
     frame.locator('[role="checkbox"]'),
@@ -796,22 +813,13 @@ async function clickTurnstileFrame(page, frame) {
     if (!visible) continue;
     const clicked = await target
       .first()
-      .click({ delay: 75 + Math.random() * 75, timeout: 1_000 })
+      .click({ delay: 90 + Math.random() * 80, timeout: 1_500 })
       .then(() => true)
       .catch(() => false);
     if (clicked) return true;
   }
 
-  const frameElement = await frame.frameElement().catch(() => null);
-  const box = await frameElement?.boundingBox().catch(() => null);
-  if (!box) return false;
-
-  await page.mouse.click(
-    box.x + Math.min(28, box.width / 2),
-    box.y + box.height / 2,
-    { delay: 75 + Math.random() * 75 },
-  );
-  return true;
+  return false;
 }
 
 async function solveCloudflareChallenge(
@@ -838,9 +846,10 @@ async function solveCloudflareChallenge(
       return { passed: false, clickCount, clickLimitReached: true };
     }
 
-    const waitBeforeNextClick = 1_750 - (Date.now() - lastClickAt);
+    // Beri jeda minimal 4.5 detik agar animasi verifikasi Cloudflare selesai memvalidasi
+    const waitBeforeNextClick = 4_500 - (Date.now() - lastClickAt);
     if (waitBeforeNextClick > 0) {
-      await page.waitForTimeout(Math.min(waitBeforeNextClick, 250));
+      await page.waitForTimeout(Math.min(waitBeforeNextClick, 500));
       continue;
     }
 
@@ -902,8 +911,157 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
     .catch(() => false);
 }
 
+async function scrapeDitusiWithRealBrowser(url, selector, headed, options = {}) {
+  let connect;
+  try {
+    ({ connect } = require("puppeteer-real-browser"));
+  } catch (e) {
+    console.log("[Ditusi Real Browser] require failed:", e.message);
+    return null;
+  }
+
+  console.log("[Ditusi Real Browser] Menghubungkan puppeteer-real-browser...");
+  let browser;
+  try {
+    const connection = await connect({
+      headless: false,
+      turnstile: true,
+      args: ["--no-sandbox"],
+    });
+    browser = connection.browser;
+    const page = connection.page;
+
+    await page.goto(url.href, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
+
+    let passed = false;
+    for (let s = 1; s <= 35; s += 1) {
+      await new Promise((r) => setTimeout(r, 1_000));
+      const title = await page.title().catch(() => "");
+      console.log(`[Ditusi Real Browser] Detik ${s}: Title = "${title}" | URL = ${page.url()}`);
+      if (/ditusi|roblox|voucher/i.test(title) && !/just a moment|tunggu sebentar/i.test(title)) {
+        console.log(`[Ditusi Real Browser] 🎉 Lolos Cloudflare di detik ke-${s}! Title: ${title}`);
+        passed = true;
+        break;
+      }
+    }
+
+    if (!passed) {
+      throw new Error("Verifikasi Cloudflare Ditusi tidak selesai dalam batas waktu.");
+    }
+
+    await new Promise((r) => setTimeout(r, 2_500));
+
+    await page.evaluate(() => {
+      document
+        .querySelectorAll(".modal, .modal-backdrop, #modal-request-permission, #customModal")
+        .forEach((el) => el.remove());
+      document.body?.classList?.remove("modal-open");
+    });
+
+    // Ambil dan klik semua tab kategori Ditusi (Roblox Gift Card IDR, Roblox Robux Instan, dll)
+    const categoryLabels = await page.evaluate(() => {
+      const labels = Array.from(
+        document.querySelectorAll("#group-category-game label, .wrapp-title-category"),
+      )
+        .map((el) => el.innerText?.trim())
+        .filter(Boolean);
+      return Array.from(new Set(labels)).filter(
+        (t) => /(?:gift\s*card|robux|voucher)/i.test(t) && t.length < 40,
+      );
+    });
+
+    const collectVisible = async () => {
+      return await page.evaluate(() => {
+        const els = Array.from(
+          document.querySelectorAll(
+            ".item-product-click, .product-item, .card-product, [class*='item-product']",
+          ),
+        );
+        return els
+          .filter((el) => el.offsetParent !== null)
+          .map((el) => {
+            const text = el.innerText.replace(/\s+/g, " ").trim();
+            const priceMatch = text.match(/Rp\.?\s*[\d.]+/i);
+            if (!priceMatch) return null;
+            const harga = priceMatch[0];
+            const produk = text.split(/Rp\.?/i)[0].replace(/Termurah/gi, "").trim();
+            return produk && harga ? { Produk: produk, Harga: harga } : null;
+          })
+          .filter(Boolean);
+      });
+    };
+
+    const collectedRawRows = [];
+    const seenDitusiRows = new Set();
+    const addRows = (items) => {
+      for (const item of items) {
+        const key = `${item.Produk.toLowerCase()}|${item.Harga.toLowerCase()}`;
+        if (!seenDitusiRows.has(key)) {
+          seenDitusiRows.add(key);
+          collectedRawRows.push(item);
+        }
+      }
+    };
+
+    // Ambil produk dari tab default yang pertama terbuka
+    addRows(await collectVisible());
+
+    // Klik tiap sub-tab kategori untuk mengambil produk lainnya (Robux Instan, dll)
+    for (const cat of categoryLabels) {
+      await page.evaluate((targetCat) => {
+        const els = Array.from(
+          document.querySelectorAll("#group-category-game label, .wrapp-title-category, button, a"),
+        );
+        const match = els.find((el) => el.innerText?.trim() === targetCat);
+        if (match) match.click();
+      }, cat);
+
+      await new Promise((r) => setTimeout(r, 1_200));
+      addRows(await collectVisible());
+    }
+
+    if (!collectedRawRows.length) return null;
+
+    const seen = new Set();
+    const rows = [];
+    for (const item of collectedRawRows) {
+      const key = `${item.Produk.toLowerCase()}|${item.Harga.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        rows.push(item);
+      }
+    }
+
+    const finalRows = rows.map((row, index) => ({
+      No: index + 1,
+      ...row,
+      Sumber: url.href,
+      _usedAiFallback: false,
+    }));
+    finalRows._usedAiFallback = false;
+    return finalRows;
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
 async function scrape(url, selector, headed, options = {}) {
   url = url instanceof URL ? url : new URL(url);
+
+  if (url.hostname.replace(/^www\./, "") === "ditusi.co.id") {
+    try {
+      const ditusiRows = await scrapeDitusiWithRealBrowser(url, selector, headed, options);
+      if (ditusiRows && ditusiRows.length) {
+        return ditusiRows;
+      }
+    } catch (err) {
+      console.log(`[Ditusi Real Browser] Warning: ${err.message}. Mencoba Playwright fallback...`);
+    }
+  }
+
   const ownsBrowser = !options.browser;
   const browser = options.browser || await chromium.launch({ headless: !headed });
   let context = null;
@@ -959,7 +1117,7 @@ async function scrape(url, selector, headed, options = {}) {
       const isDitusi = url.hostname.replace(/^www\./, "") === "ditusi.co.id";
       const challenge = await solveCloudflareChallenge(page, {
         timeout: 120_000,
-        maxClicks: isDitusi ? 2 : Number.POSITIVE_INFINITY,
+        maxClicks: isDitusi ? 4 : Number.POSITIVE_INFINITY,
       });
       if (!challenge.passed) {
         const message = challenge.clickLimitReached
