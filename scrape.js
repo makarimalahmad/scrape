@@ -744,15 +744,17 @@ async function extractSpecialRows(page, url, interceptedPayloads = []) {
   return null;
 }
 
-async function createOptimizedContext(browser) {
+async function createOptimizedContext(browser, contextOptions = {}) {
   return browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 800 },
     locale: "id-ID",
     timezoneId: "Asia/Jakarta",
+    ...contextOptions,
   });
 }
+
 
 const CLOUDFLARE_CHALLENGE_PATTERN =
   /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda|just a moment/i;
@@ -911,7 +913,118 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
     .catch(() => false);
 }
 
-const REAL_BROWSER_DOMAINS = ["ditusi.co.id", "bangjeff.com", "ourastore.com"];
+function parseProxy(input) {
+  const raw = input || process.env.PROXY_URL || process.env.PROXY_SERVER;
+  if (!raw) return null;
+
+  if (typeof raw === "object") {
+    const server =
+      raw.server ||
+      (raw.host && raw.port ? `http://${raw.host}:${raw.port}` : null);
+    if (!server) return null;
+    return {
+      server,
+      username: raw.username || process.env.PROXY_USERNAME || undefined,
+      password: raw.password || process.env.PROXY_PASSWORD || undefined,
+    };
+  }
+
+  if (typeof raw !== "string") return null;
+  const str = raw.trim();
+  if (!str) return null;
+
+  // Format 1: host:port:username:password
+  const parts = str.split(":");
+  if (parts.length >= 4 && !str.includes("://")) {
+    const host = parts[0];
+    const port = parts[1];
+    const user = parts[2];
+    const pass = parts.slice(3).join(":");
+    return {
+      server: `http://${host}:${port}`,
+      username: user,
+      password: pass,
+    };
+  }
+
+  // Format 2: host:port (tanpa auth inline)
+  if (parts.length === 2 && !str.includes("://") && /^\d+$/.test(parts[1])) {
+    return {
+      server: `http://${parts[0]}:${parts[1]}`,
+      username: process.env.PROXY_USERNAME || undefined,
+      password: process.env.PROXY_PASSWORD || undefined,
+    };
+  }
+
+  // Format 3: http://user:pass@host:port atau socks5://...
+  try {
+    const normalized = str.includes("://") ? str : `http://${str}`;
+    const parsed = new URL(normalized);
+    const server = `${parsed.protocol}//${parsed.host}`;
+    const username = parsed.username
+      ? decodeURIComponent(parsed.username)
+      : process.env.PROXY_USERNAME || undefined;
+    const password = parsed.password
+      ? decodeURIComponent(parsed.password)
+      : process.env.PROXY_PASSWORD || undefined;
+    return {
+      server,
+      username: username || undefined,
+      password: password || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getProxyForUrl(url, options = {}) {
+  const explicitProxy = options.proxy ? parseProxy(options.proxy) : null;
+  const globalProxy = parseProxy();
+  const proxyConfig = explicitProxy || globalProxy;
+  if (!proxyConfig) return null;
+
+  if (options.forceProxy) return proxyConfig;
+
+  const rawDomains = process.env.PROXY_DOMAINS || "bangjeff.com";
+  const proxyDomains = rawDomains
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (proxyDomains.includes("*") || proxyDomains.includes("all")) {
+    return proxyConfig;
+  }
+
+  const hostname = (url instanceof URL ? url.hostname : new URL(url).hostname)
+    .replace(/^www\./, "")
+    .toLowerCase();
+
+  const matches = proxyDomains.some(
+    (d) => hostname === d || hostname.endsWith(`.${d}`),
+  );
+  if (matches) {
+    return proxyConfig;
+  }
+
+  return null;
+}
+
+function toRealBrowserProxy(proxyConfig) {
+  if (!proxyConfig || !proxyConfig.server) return undefined;
+  try {
+    const u = new URL(proxyConfig.server);
+    return {
+      host: u.hostname,
+      port: Number.parseInt(u.port, 10) || (u.protocol === "https:" ? 443 : 80),
+      username: proxyConfig.username || undefined,
+      password: proxyConfig.password || undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+const REAL_BROWSER_DOMAINS = ["ditusi.co.id"];
 
 async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
   let connect;
@@ -938,11 +1051,22 @@ async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
   console.log(`[Real Browser] Menghubungkan puppeteer-real-browser untuk ${domain}...`);
   let browser;
   try {
-    const connection = await connect({
+    const connectOptions = {
       headless: false,
       turnstile: true,
       args: ["--no-sandbox"],
-    });
+    };
+
+    const proxyConfig = getProxyForUrl(url, options);
+    const realProxy = toRealBrowserProxy(proxyConfig);
+    if (realProxy) {
+      connectOptions.proxy = realProxy;
+      console.log(
+        `[Real Browser] Menggunakan proxy untuk ${domain}: ${realProxy.host}:${realProxy.port}`,
+      );
+    }
+
+    const connection = await connect(connectOptions);
     browser = connection.browser;
     const page = connection.page;
 
@@ -1144,12 +1268,26 @@ async function scrape(url, selector, headed, options = {}) {
     }
   }
 
+  const proxyConfig = getProxyForUrl(url, options);
+  const usedProxy = Boolean(proxyConfig);
+  if (usedProxy) {
+    console.log(`[Proxy] Menggunakan proxy untuk ${domain} (${proxyConfig.server})`);
+  }
+
   const ownsBrowser = !options.browser;
-  const browser = options.browser || await chromium.launch({ headless: !headed });
+  const browserLaunchOptions = { headless: !headed };
+  if (proxyConfig && ownsBrowser) {
+    browserLaunchOptions.proxy = proxyConfig;
+  }
+  const browser = options.browser || (await chromium.launch(browserLaunchOptions));
   let context = null;
 
   try {
-    context = await createOptimizedContext(browser);
+    const contextOptions = {};
+    if (proxyConfig && !ownsBrowser) {
+      contextOptions.proxy = proxyConfig;
+    }
+    context = await createOptimizedContext(browser, contextOptions);
     const page = await context.newPage();
 
     const interceptedPayloads = [];
@@ -1196,12 +1334,31 @@ async function scrape(url, selector, headed, options = {}) {
     }
 
     if (hasCloudflare) {
+      // Jika 403 atau Cloudflare terdeteksi dan belum pakai proxy, auto-retry dengan proxy jika dikonfigurasi
+      if (!usedProxy && parseProxy()) {
+        console.log(
+          `[Proxy] Akses ke ${domain} terblokir (HTTP ${response?.status() || "Cloudflare"}). Mencoba ulang otomatis menggunakan proxy...`,
+        );
+        await context.close().catch(() => {});
+        if (ownsBrowser) await browser.close().catch(() => {});
+        return await scrape(url, selector, headed, { ...options, forceProxy: true });
+      }
+
       const isDitusi = url.hostname.replace(/^www\./, "") === "ditusi.co.id";
       const challenge = await solveCloudflareChallenge(page, {
         timeout: 120_000,
         maxClicks: isDitusi ? 4 : Number.POSITIVE_INFINITY,
       });
       if (!challenge.passed) {
+        if (!usedProxy && parseProxy()) {
+          console.log(
+            `[Proxy] Verifikasi Cloudflare tidak selesai di ${domain}. Mencoba ulang menggunakan proxy...`,
+          );
+          await context.close().catch(() => {});
+          if (ownsBrowser) await browser.close().catch(() => {});
+          return await scrape(url, selector, headed, { ...options, forceProxy: true });
+        }
+
         const message = challenge.clickLimitReached
           ? `Cloudflare terus mengulang challenge setelah ${challenge.clickCount} klik otomatis. Situs dilewati tanpa retry langsung.`
           : `Verifikasi Cloudflare tidak selesai dalam 2 menit setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
@@ -1907,7 +2064,10 @@ module.exports = {
   parseRobloxProductCard,
   parseUniPinCardText,
   parseUPointCardText,
+  getProxyForUrl,
+  parseProxy,
   saveInvalidReport,
   scrape,
   validateUrl,
 };
+

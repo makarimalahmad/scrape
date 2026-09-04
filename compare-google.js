@@ -344,7 +344,7 @@ async function scrapeStore(store, gameConfig, options) {
         return extractedRows;
       },
       undefined,
-      { browser: options.browser },
+      { browser: options.browser, proxy: options.proxy },
     );
     allRows.push(...rows);
     if (validation && typeof validation.confidence === "number") {
