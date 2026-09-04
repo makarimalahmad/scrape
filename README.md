@@ -170,6 +170,30 @@ async function main() {
 main();
 ```
 
+### 4. Penggunaan Proxy pada SDK (`proxy`)
+Secara default, jika variabel `PROXY_URL` sudah diset di `.env`, SDK akan otomatis menggunakan proxy tersebut secara cerdas (*smart routing*) hanya untuk toko yang membutuhkannya (seperti Bangjeff).
+
+Namun, tim lain juga dapat menyertakan parameter `proxy` secara langsung di pemanggilan fungsi tanpa bergantung pada `.env`:
+
+```javascript
+const { scrapeUrl, compareGame } = require("@makarimalahmad/price-scraper-sdk");
+
+async function main() {
+  // Format URL Standar:
+  const result1 = await scrapeUrl("https://www.bangjeff.com/id-id/mobile-legends", {
+    proxy: "http://user:pass@isp.decodo.com:10001",
+  });
+
+  // Format Raw Provider (Decodo/Webshare/dll):
+  const result2 = await compareGame("mobile-legends", {
+    proxy: "isp.decodo.com:10001:username:password",
+    limit: 5,
+  });
+}
+
+main();
+```
+
 ---
 
 ## 📖 Referensi Parameter
