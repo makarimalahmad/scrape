@@ -911,16 +911,31 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
     .catch(() => false);
 }
 
-async function scrapeDitusiWithRealBrowser(url, selector, headed, options = {}) {
+const REAL_BROWSER_DOMAINS = ["ditusi.co.id", "bangjeff.com", "ourastore.com"];
+
+async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
   let connect;
   try {
     ({ connect } = require("puppeteer-real-browser"));
   } catch (e) {
-    console.log("[Ditusi Real Browser] require failed:", e.message);
+    console.log("[Real Browser] require failed:", e.message);
     return null;
   }
 
-  console.log("[Ditusi Real Browser] Menghubungkan puppeteer-real-browser...");
+  // Auto-detect Playwright Chromium path jika CHROME_PATH belum diatur
+  if (!process.env.CHROME_PATH) {
+    try {
+      const pwPath = chromium.executablePath();
+      if (pwPath && fs.existsSync(pwPath)) {
+        process.env.CHROME_PATH = pwPath;
+      }
+    } catch {
+      // Abaikan jika tidak tersedia
+    }
+  }
+
+  const domain = url.hostname.replace(/^www\./, "");
+  console.log(`[Real Browser] Menghubungkan puppeteer-real-browser untuk ${domain}...`);
   let browser;
   try {
     const connection = await connect({
@@ -940,87 +955,148 @@ async function scrapeDitusiWithRealBrowser(url, selector, headed, options = {}) 
     for (let s = 1; s <= 35; s += 1) {
       await new Promise((r) => setTimeout(r, 1_000));
       const title = await page.title().catch(() => "");
-      console.log(`[Ditusi Real Browser] Detik ${s}: Title = "${title}" | URL = ${page.url()}`);
-      if (/ditusi|roblox|voucher/i.test(title) && !/just a moment|tunggu sebentar/i.test(title)) {
-        console.log(`[Ditusi Real Browser] 🎉 Lolos Cloudflare di detik ke-${s}! Title: ${title}`);
+      console.log(`[Real Browser] Detik ${s}: Title = "${title}" | URL = ${page.url()}`);
+      if (!/just a moment|tunggu sebentar/i.test(title)) {
+        console.log(`[Real Browser] 🎉 Lolos Cloudflare di detik ke-${s}! Title: ${title}`);
         passed = true;
         break;
       }
     }
 
     if (!passed) {
-      throw new Error("Verifikasi Cloudflare Ditusi tidak selesai dalam batas waktu.");
+      throw new Error(`Verifikasi Cloudflare ${domain} tidak selesai dalam batas waktu.`);
     }
 
     await new Promise((r) => setTimeout(r, 2_500));
 
     await page.evaluate(() => {
       document
-        .querySelectorAll(".modal, .modal-backdrop, #modal-request-permission, #customModal")
+        .querySelectorAll(".modal, .modal-backdrop, #modal-request-permission, #customModal, [class*='modal-backdrop']")
         .forEach((el) => el.remove());
       document.body?.classList?.remove("modal-open");
     });
 
-    // Ambil dan klik semua tab kategori Ditusi (Roblox Gift Card IDR, Roblox Robux Instan, dll)
-    const categoryLabels = await page.evaluate(() => {
-      const labels = Array.from(
-        document.querySelectorAll("#group-category-game label, .wrapp-title-category"),
-      )
-        .map((el) => el.innerText?.trim())
-        .filter(Boolean);
-      return Array.from(new Set(labels)).filter(
-        (t) => /(?:gift\s*card|robux|voucher)/i.test(t) && t.length < 40,
-      );
-    });
+    let collectedRawRows = [];
 
-    const collectVisible = async () => {
-      return await page.evaluate(() => {
-        const els = Array.from(
-          document.querySelectorAll(
-            ".item-product-click, .product-item, .card-product, [class*='item-product']",
-          ),
-        );
-        return els
-          .filter((el) => el.offsetParent !== null)
-          .map((el) => {
-            const text = el.innerText.replace(/\s+/g, " ").trim();
-            const priceMatch = text.match(/Rp\.?\s*[\d.]+/i);
-            if (!priceMatch) return null;
-            const harga = priceMatch[0];
-            const produk = text.split(/Rp\.?/i)[0].replace(/Termurah/gi, "").trim();
-            return produk && harga ? { Produk: produk, Harga: harga } : null;
-          })
+    // 1. Ekstraksi Khusus Ditusi (Multi-Tab Kategori)
+    if (domain === "ditusi.co.id") {
+      const categoryLabels = await page.evaluate(() => {
+        const labels = Array.from(
+          document.querySelectorAll("#group-category-game label, .wrapp-title-category"),
+        )
+          .map((el) => el.innerText?.trim())
           .filter(Boolean);
-      });
-    };
-
-    const collectedRawRows = [];
-    const seenDitusiRows = new Set();
-    const addRows = (items) => {
-      for (const item of items) {
-        const key = `${item.Produk.toLowerCase()}|${item.Harga.toLowerCase()}`;
-        if (!seenDitusiRows.has(key)) {
-          seenDitusiRows.add(key);
-          collectedRawRows.push(item);
-        }
-      }
-    };
-
-    // Ambil produk dari tab default yang pertama terbuka
-    addRows(await collectVisible());
-
-    // Klik tiap sub-tab kategori untuk mengambil produk lainnya (Robux Instan, dll)
-    for (const cat of categoryLabels) {
-      await page.evaluate((targetCat) => {
-        const els = Array.from(
-          document.querySelectorAll("#group-category-game label, .wrapp-title-category, button, a"),
+        return Array.from(new Set(labels)).filter(
+          (t) => /(?:gift\s*card|robux|voucher)/i.test(t) && t.length < 40,
         );
-        const match = els.find((el) => el.innerText?.trim() === targetCat);
-        if (match) match.click();
-      }, cat);
+      });
 
-      await new Promise((r) => setTimeout(r, 1_200));
+      const collectVisible = async () => {
+        return await page.evaluate(() => {
+          const els = Array.from(
+            document.querySelectorAll(
+              ".item-product-click, .product-item, .card-product, [class*='item-product']",
+            ),
+          );
+          return els
+            .filter((el) => el.offsetParent !== null)
+            .map((el) => {
+              const text = el.innerText.replace(/\s+/g, " ").trim();
+              const priceMatch = text.match(/Rp\.?\s*[\d.]+/i);
+              if (!priceMatch) return null;
+              const harga = priceMatch[0];
+              const produk = text.split(/Rp\.?/i)[0].replace(/Termurah/gi, "").trim();
+              return produk && harga ? { Produk: produk, Harga: harga } : null;
+            })
+            .filter(Boolean);
+        });
+      };
+
+      const seenDitusiRows = new Set();
+      const addRows = (items) => {
+        for (const item of items) {
+          const key = `${item.Produk.toLowerCase()}|${item.Harga.toLowerCase()}`;
+          if (!seenDitusiRows.has(key)) {
+            seenDitusiRows.add(key);
+            collectedRawRows.push(item);
+          }
+        }
+      };
+
       addRows(await collectVisible());
+
+      for (const cat of categoryLabels) {
+        await page.evaluate((targetCat) => {
+          const els = Array.from(
+            document.querySelectorAll("#group-category-game label, .wrapp-title-category, button, a"),
+          );
+          const match = els.find((el) => el.innerText?.trim() === targetCat);
+          if (match) match.click();
+        }, cat);
+
+        await new Promise((r) => setTimeout(r, 1_200));
+        addRows(await collectVisible());
+      }
+    } else {
+      // 2. Ekstraksi Toko Umum & Berbasis API (Bangjeff, Ourastore, dll)
+      console.log(`[Real Browser] Menunggu produk ${domain} dimuat...`);
+      for (let w = 0; w < 25; w += 1) {
+        const hasProducts = await page.evaluate(() => {
+          const text = document.body?.innerText || "";
+          return (
+            /(?:Rp\.?|IDR)\s*\d/i.test(text) &&
+            /(?:diamond|member|card|pass|pack|roblox|robux|voucher)/i.test(text)
+          );
+        });
+        if (hasProducts) break;
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+
+      collectedRawRows = await page.evaluate(() => {
+        const cardSelectors = [
+          '[class*="group/variant"]',
+          '.denom',
+          '[class*="product-item"]',
+          '[class*="card-product"]',
+          '[class*="item-product"]',
+          '[class*="product"]',
+          '[class*="card"]',
+          'article',
+          'li',
+          'label',
+          'button',
+          '[role="radio"]',
+        ];
+
+        const cards = Array.from(
+          document.querySelectorAll(cardSelectors.join(", ")),
+        ).filter((el) => el.offsetParent !== null && (el.innerText?.length || 0) < 250);
+
+        const items = [];
+        const seen = new Set();
+
+        for (const card of cards) {
+          const text = (card.innerText || "").replace(/\s+/g, " ").trim();
+          const priceMatch = text.match(/(?:Rp\.?|IDR)\s*[\d.]+/i);
+          if (!priceMatch) continue;
+
+          const harga = priceMatch[0];
+          let produk = text
+            .split(/(?:Rp\.?|IDR)\s*[\d.]+/i)[0]
+            .replace(/\b(?:beli|buy|pilih|select|diskon|promo|flashsale|termurah|best seller|out of stock)\b/gi, "")
+            .replace(/-\d+%/g, "")
+            .trim();
+
+          if (!produk || produk.length < 2 || produk.length > 80) continue;
+
+          const key = `${produk.toLowerCase()}|${harga.toLowerCase()}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            items.push({ Produk: produk, Harga: harga });
+          }
+        }
+        return items;
+      });
     }
 
     if (!collectedRawRows.length) return null;
@@ -1050,15 +1126,16 @@ async function scrapeDitusiWithRealBrowser(url, selector, headed, options = {}) 
 
 async function scrape(url, selector, headed, options = {}) {
   url = url instanceof URL ? url : new URL(url);
+  const domain = url.hostname.replace(/^www\./, "");
 
-  if (url.hostname.replace(/^www\./, "") === "ditusi.co.id") {
+  if (REAL_BROWSER_DOMAINS.includes(domain)) {
     try {
-      const ditusiRows = await scrapeDitusiWithRealBrowser(url, selector, headed, options);
-      if (ditusiRows && ditusiRows.length) {
-        return ditusiRows;
+      const realRows = await scrapeWithRealBrowser(url, selector, headed, options);
+      if (realRows && realRows.length) {
+        return realRows;
       }
     } catch (err) {
-      console.log(`[Ditusi Real Browser] Warning: ${err.message}. Mencoba Playwright fallback...`);
+      console.log(`[Real Browser] Warning: ${err.message}. Mencoba Playwright fallback...`);
     }
   }
 
@@ -1718,6 +1795,28 @@ function evaluateDomProducts({ defaultSelector, hostname, pathname }) {
     }));
     finalRows._usedAiFallback = usedAiFallback;
     return finalRows;
+  } catch (error) {
+    if (context) await context.close().catch(() => {});
+    if (ownsBrowser) await browser.close().catch(() => {});
+    context = null;
+
+    // Auto-fallback ke Real Browser jika Playwright gagal karena proteksi Cloudflare atau API timeout
+    if (
+      !REAL_BROWSER_DOMAINS.includes(domain) &&
+      /cloudflare|api produk|challenge|blocked|just a moment/i.test(error.message)
+    ) {
+      try {
+        console.log(`[Real Browser Fallback] Mencoba pemulihan otomatis via Real Browser untuk ${domain}...`);
+        const fallbackRows = await scrapeWithRealBrowser(url, selector, headed, options);
+        if (fallbackRows && fallbackRows.length) {
+          return fallbackRows;
+        }
+      } catch (realErr) {
+        console.log(`[Real Browser Fallback] Gagal: ${realErr.message}`);
+      }
+    }
+
+    throw error;
   } finally {
     if (context) await context.close().catch(() => {});
     if (ownsBrowser) await browser.close().catch(() => {});
