@@ -955,8 +955,13 @@ async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
     for (let s = 1; s <= 35; s += 1) {
       await new Promise((r) => setTimeout(r, 1_000));
       const title = await page.title().catch(() => "");
-      console.log(`[Real Browser] Detik ${s}: Title = "${title}" | URL = ${page.url()}`);
-      if (!/just a moment|tunggu sebentar/i.test(title)) {
+      const isBlockedOrChallenge =
+        !title ||
+        /just a moment|tunggu sebentar|403 forbidden|access denied|attention required|error 403|security service/i.test(
+          title,
+        );
+
+      if (!isBlockedOrChallenge) {
         console.log(`[Real Browser] 🎉 Lolos Cloudflare di detik ke-${s}! Title: ${title}`);
         passed = true;
         break;
@@ -964,7 +969,7 @@ async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
     }
 
     if (!passed) {
-      throw new Error(`Verifikasi Cloudflare ${domain} tidak selesai dalam batas waktu.`);
+      throw new Error(`Verifikasi Cloudflare/Akses ke ${domain} ditolak (Title: "${await page.title().catch(() => "")}"). Kemungkinan IP server diblokir WAF situs.`);
     }
 
     await new Promise((r) => setTimeout(r, 2_500));
