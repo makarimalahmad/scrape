@@ -745,13 +745,26 @@ async function extractSpecialRows(page, url, interceptedPayloads = []) {
 }
 
 async function createOptimizedContext(browser) {
-  return browser.newContext({
+  const context = await browser.newContext({
     userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    viewport: { width: 1280, height: 800 },
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    viewport: { width: 1366, height: 768 },
     locale: "id-ID",
     timezoneId: "Asia/Jakarta",
+    extraHTTPHeaders: {
+      "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+      "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"Windows"',
+    },
   });
+  await context.addInitScript(() => {
+    try {
+      Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+      Object.defineProperty(navigator, "languages", { get: () => ["id-ID", "id", "en-US", "en"] });
+    } catch {}
+  });
+  return context;
 }
 
 const CLOUDFLARE_CHALLENGE_PATTERN =
@@ -941,10 +954,26 @@ async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
     const connection = await connect({
       headless: false,
       turnstile: true,
-      args: ["--no-sandbox"],
+      args: ["--no-sandbox", "--lang=id-ID,id"],
     });
     browser = connection.browser;
     const page = connection.page;
+
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    ).catch(() => {});
+    await page.setExtraHTTPHeaders({
+      "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+      "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"Windows"',
+    }).catch(() => {});
+    await page.evaluateOnNewDocument(() => {
+      try {
+        Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+        Object.defineProperty(navigator, "languages", { get: () => ["id-ID", "id", "en-US", "en"] });
+      } catch {}
+    }).catch(() => {});
 
     await page.goto(url.href, {
       waitUntil: "domcontentloaded",
@@ -1045,6 +1074,7 @@ async function scrapeWithRealBrowser(url, selector, headed, options = {}) {
     } else {
       // 2. Ekstraksi Toko Umum & Berbasis API (Bangjeff, Ourastore, dll)
       console.log(`[Real Browser] Menunggu produk ${domain} dimuat...`);
+      await page.evaluate(() => window.scrollBy(0, 500)).catch(() => {});
       for (let w = 0; w < 25; w += 1) {
         const hasProducts = await page.evaluate(() => {
           const text = document.body?.innerText || "";
@@ -1218,6 +1248,8 @@ async function scrape(url, selector, headed, options = {}) {
     await waitForProductData(page, 30_000, url.hostname);
 
     if (/ourastore\.com$|bangjeff\.com$/i.test(url.hostname)) {
+      await page.evaluate(() => window.scrollBy(0, 500)).catch(() => {});
+      await page.waitForTimeout(1_000);
       const waitForProductCards = () =>
         page
           .waitForFunction(
