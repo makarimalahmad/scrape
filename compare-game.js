@@ -421,6 +421,7 @@ async function processGame(apiKey, gameConfig, options) {
     .filter((result) => !result.success)
     .map((result) => ({
       position: result.source.position,
+      organicPosition: result.source.organicPosition ?? null,
       name: result.source.store,
       url: result.source.link,
       error: result.error.message,
@@ -459,6 +460,7 @@ async function processGame(apiKey, gameConfig, options) {
       name: store.name,
       classification: "COMPETITOR",
       position: store.position,
+      organicPosition: store.organicPosition ?? null,
       url: store.url,
       productCount: store.products.size,
       status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
@@ -479,6 +481,7 @@ async function processGame(apiKey, gameConfig, options) {
       name: store.name || store.store,
       classification: "COMPETITOR",
       position: store.position,
+      organicPosition: store.organicPosition ?? null,
       url: store.url,
       productCount: 0,
       status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
