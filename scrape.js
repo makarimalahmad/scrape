@@ -124,7 +124,7 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
           );
         const hasPrice = /(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d/i.test(text);
         const hasProduct =
-          /(?:diamond|\bdm\b|pass|pack|card|member|membership|robux|voucher|\buc\b|point|token|crystal|gold|coin|credit)/i.test(
+          /(?:diamond|\bdm\b|berlian|pass|booyah|evo\s*vault|pack|card|member|membership|robux|voucher|\buc\b|point|token|crystal|gold|coin|credit)/i.test(
             text,
           );
         return !challengeVisible && hasPrice && hasProduct;
@@ -222,6 +222,13 @@ async function triggerStoreSpecificInteractions(page, url) {
 
 async function scrape(url, selector, headed, options = {}) {
   url = url instanceof URL ? url : new URL(url);
+  if (
+    url.hostname.endsWith("lootbar.com") &&
+    url.pathname.includes("free-fire") &&
+    !url.searchParams.has("region")
+  ) {
+    url.searchParams.set("region", "ff_id");
+  }
   const domain = url.hostname.replace(/^www\./, "");
 
   // 1. Delegasi ke Real Browser untuk domain khusus Turnstile
