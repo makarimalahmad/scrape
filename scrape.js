@@ -403,13 +403,20 @@ async function scrape(url, selector, headed, options = {}) {
       throw err;
     }
 
-    const finalRows = rows.map((row, index) => ({
-      No: index + 1,
-      ...row,
-      Sumber: url.href,
-      _usedAiFallback: usedAiFallback || Boolean(row._usedAiFallback),
-    }));
-    finalRows._usedAiFallback = usedAiFallback;
+    const finalRows = rows.map((row, index) => {
+      const cleanRow = { ...row };
+      delete cleanRow._usedAiFallback;
+      return {
+        No: index + 1,
+        ...cleanRow,
+        Sumber: url.href,
+      };
+    });
+    Object.defineProperty(finalRows, "_usedAiFallback", {
+      value: usedAiFallback,
+      enumerable: false,
+      writable: true,
+    });
     return finalRows;
   } catch (error) {
     if (context) await context.close().catch(() => {});
