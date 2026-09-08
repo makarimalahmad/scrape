@@ -127,29 +127,23 @@ Struktur objek yang dikembalikan oleh fungsi `compareGame`:
 ## ⚙️ Kustomisasi Tambahan
 
 ### 1. Kustomisasi Pajak / Biaya Toko (`calculateTax`)
-Secara default, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dari website toko. Anda dapat menyertakan callback `calculateTax` untuk menambahkan PPN 11% atau biaya admin pada toko tertentu:
+Secara default, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dari website toko. Anda dapat mengoper objek **Dictionary** untuk menerapkan PPN 11%, biaya admin QRIS, atau penyesuaian harga khusus per toko:
 
 ```javascript
 const result = await compareGame("free-fire", {
   limit: 10,
-  calculateTax: ({ hostname, rawPrice }) => {
-    // Terapkan PPN 11% khusus pada toko-toko berikut:
-    const tokoKenaPPN11 = [
-      "codashop.com",
-      "unipin.com",
-      "itemku.com",
-      "vcgamers.com",
-    ];
-
-    if (tokoKenaPPN11.some((domain) => hostname.includes(domain))) {
-      return Math.round(rawPrice * 1.11);
-    }
-
-    // Toko lainnya (termasuk UPoint & DuniaGames) tetap harga normal
-    return rawPrice;
+  calculateTax: {
+    "codashop.com": 1.11,                               // PPN 11%
+    "unipin.com": 1.11,                                 // PPN 11%
+    "itemku.com": 1.007,                                // Biaya QRIS 0.7%
+    "ditusi.co.id": (price) => (price * 1.11) * 1.007, // Gabungan PPN 11% + QRIS 0.7%
   },
 });
 ```
+
+> **Tips:** 
+> - Nama domain toko otomatis dinormalisasi oleh SDK (tanpa awalan `www.` dan berhuruf kecil), jadi Anda cukup menulis `"codashop.com"`.
+> - Toko lain yang tidak dicantumkan di dalam dictionary (seperti UPoint atau DuniaGames) otomatis harganya tetap normal apa adanya.
 
 ### 2. Penggunaan Proxy (`proxy`)
 Selain melalui file `.env` (`PROXY_URL`), opsi proxy dapat langsung dioperasikan saat pemanggilan fungsi:
@@ -213,7 +207,7 @@ node compare-game.js --game all
 | `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika timeout (1–5). |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
-| `calculateTax` | `function` | `null` | Callback kustom PPN/biaya `{ hostname, rawPrice, productName, game }`. |
+| `calculateTax` | `object` | `null` | Dictionary aturan PPN / biaya per toko `{ "domain": multiplier/function }`. |
 | `proxy` | `string` / `object` | `null` | Konfigurasi proxy opsional (`host:port:user:pass` atau `http://...`). |
 
 ---

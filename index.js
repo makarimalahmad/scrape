@@ -25,6 +25,8 @@ const {
   exportScrapeXlsx,
 } = require("./compare-game");
 const {
+  applyTaxCalculation,
+  extractDomain,
   findMatches,
   parseProduct,
   parsePrice,
@@ -40,6 +42,7 @@ const { extractWithGroq } = require("./lib/extractors/ai-extractor");
  * @param {boolean} [options.headed=false] - Run with visible browser
  * @param {string} [options.gameId] - Optional game ID for domain validation
  * @param {string} [options.exportCsvPath] - Optional path to export CSV
+ * @param {Object} [options.calculateTax] - Optional dictionary of tax/fee rules per store domain
  * @param {string|Object} [options.proxy] - Optional proxy URL string (host:port:user:pass or http://...) or proxy object
  * @returns {Promise<{ success: boolean, url: string, products: Array<{ name: string, price: string, rawPrice: number }>, count: number, confidence: number, status: string, error?: string, csvPath?: string, reasons?: string[] }>}
  */
@@ -59,31 +62,25 @@ async function scrapeUrl(url, options = {}) {
 
     const parsedUrl = new URL(url);
     const hostname = parsedUrl.hostname;
+    const domain = extractDomain(hostname, url);
     const calculateTax = options.calculateTax;
 
     const products = rawRows.map((r) => {
       let numPrice = Number(String(r.Harga || "").replace(/[^\d]/g, "")) || 0;
       let displayPrice = r.Harga;
-      if (typeof calculateTax === "function") {
-        try {
-          const adjusted = calculateTax({
-            rawPrice: numPrice,
-            productName: r.Produk,
-            rawProduct: r.Produk,
-            hostname,
-            url,
-            game: options.gameId || null,
-          });
-          if (
-            typeof adjusted === "number" &&
-            !Number.isNaN(adjusted) &&
-            adjusted >= 0
-          ) {
-            numPrice = Math.round(adjusted);
-            displayPrice = `Rp ${numPrice.toLocaleString("id-ID")}`;
-          }
-        } catch {
-          // Abaikan error fungsi kustom
+      if (calculateTax) {
+        const adjusted = applyTaxCalculation(calculateTax, {
+          rawPrice: numPrice,
+          productName: r.Produk,
+          rawProduct: r.Produk,
+          hostname,
+          domain,
+          url,
+          game: options.gameId || null,
+        });
+        if (adjusted !== numPrice) {
+          numPrice = adjusted;
+          displayPrice = `Rp ${numPrice.toLocaleString("id-ID")}`;
         }
       }
       return {
@@ -154,14 +151,15 @@ function createPairRows(gameConfig, mainStore, competitor) {
  * @param {Object} [options]
  * @param {string} [options.game="mobile-legends"] - Game ID for parsing
  * @param {string} [options.exportCsvPath] - Optional file path to export comparison CSV
- * @param {Function} [options.calculateTax] - Optional lambda arrow function to transform/adjust tax
+ * @param {Object} [options.calculateTax] - Optional dictionary of tax/fee rules per store domain
  * @returns {Promise<Object>} Comparison result between the two URLs
  */
 async function compareUrls(mainUrl, competitorUrl, options = {}) {
   const game = options.game || "mobile-legends";
+  const rawScrapeOptions = { ...options, calculateTax: null };
   const [mainResult, competitorResult] = await Promise.all([
-    scrapeUrl(mainUrl, options),
-    scrapeUrl(competitorUrl, options),
+    scrapeUrl(mainUrl, rawScrapeOptions),
+    scrapeUrl(competitorUrl, rawScrapeOptions),
   ]);
 
   const mainHostname = new URL(mainUrl).hostname;
@@ -230,7 +228,7 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * @param {number} [options.maxAttempts=3] - Retry attempts per store
  * @param {boolean} [options.headed=false] - Run headed browser
  * @param {string} [options.exportXlsxDirectory] - Optional folder to export styled Excel (.xlsx) file
- * @param {Function} [options.calculateTax] - Optional lambda arrow function to transform/adjust tax per store
+ * @param {Object} [options.calculateTax] - Optional dictionary of tax/fee rules per store domain
  * @param {string|Object} [options.proxy] - Optional proxy URL string (host:port:user:pass or http://...) or proxy object
  * @returns {Promise<Object>} Structured comparison data with anchors and store pricing
  */
@@ -421,6 +419,8 @@ module.exports = {
   parseProduct,
   parsePrice,
   selectCheapestProducts,
+  applyTaxCalculation,
+  extractDomain,
   createProductAnchors,
   createScrapeRows,
   matchStoreToAnchors,
