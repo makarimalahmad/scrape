@@ -320,10 +320,9 @@ async function scrape(url, selector, headed, options = {}) {
         return await scrape(url, selector, headed, { ...options, forceProxy: true });
       }
 
-      const isDitusi = url.hostname.replace(/^www\./, "") === "ditusi.co.id";
       const challenge = await solveCloudflareChallenge(page, {
-        timeout: 120_000,
-        maxClicks: isDitusi ? 4 : Number.POSITIVE_INFINITY,
+        timeout: options.cloudflareTimeout ?? 60_000,
+        maxClicks: options.maxCloudflareClicks ?? 4,
       });
       if (!challenge.passed) {
         if (!usedProxy && parseProxy()) {
@@ -337,7 +336,7 @@ async function scrape(url, selector, headed, options = {}) {
 
         const message = challenge.clickLimitReached
           ? `Cloudflare terus mengulang challenge setelah ${challenge.clickCount} klik otomatis. Situs dilewati tanpa retry langsung.`
-          : `Verifikasi Cloudflare tidak selesai dalam 2 menit setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
+          : `Verifikasi Cloudflare tidak selesai dalam batas waktu setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
         const error = new Error(message);
         error.retryable = false;
         throw error;
