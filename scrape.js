@@ -91,13 +91,15 @@ async function createOptimizedContext(browser, contextOptions = {}) {
   });
 }
 
-async function waitForProductData(page, timeout = 20_000, hostname = "") {
+async function waitForProductData(page, timeout = 25_000, hostname = "") {
   const domain = hostname.replace(/^www\./, "");
   const readinessSelectors = {
     "upoint.id": ".cursor-pointer",
     "duniagames.co.id": ".denom .price-dnm .pr",
     "unipin.com": ".denom-container > button",
     "hiddengame.id": "div.product-item",
+    "bangjeff.com": '[class*="group/variant"]',
+    "ourastore.com": '[class*="group/variant"]',
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
@@ -137,35 +139,7 @@ async function waitForProductData(page, timeout = 20_000, hostname = "") {
 }
 
 async function triggerStoreSpecificInteractions(page, url) {
-  if (/ourastore\.com$|bangjeff\.com$/i.test(url.hostname)) {
-    const productsReady = await page
-      .waitForFunction(
-        () => {
-          const cards = Array.from(
-            document.querySelectorAll('[class*="group/variant"]'),
-          );
-          return cards.some((card) => {
-            const text = card.innerText || "";
-            return (
-              /(?:Rp\.?|IDR)\s*\d/i.test(text) &&
-              /(?:diamond|member|card|pass|pack|roblox|robux|voucher)/i.test(text)
-            );
-          });
-        },
-        null,
-        { timeout: 120_000 },
-      )
-      .then(() => true)
-      .catch(() => false);
-
-    if (!productsReady) {
-      throw new Error(
-        "API produk situs tidak selesai dimuat dalam 120 detik. Jangan reload karena dapat memicu Cloudflare lagi; coba jalankan ulang atau ganti jaringan.",
-      );
-    }
-  } else {
-    await waitForProductData(page, 20_000, url.hostname);
-  }
+  await waitForProductData(page, 25_000, url.hostname);
 
 
   if (url.hostname.endsWith("lootbar.com")) {
