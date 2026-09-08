@@ -53,9 +53,9 @@ main();
 
 ---
 
-## 📊 Struktur Hasil Data (`result`)
+## 📊 Struktur Return Object (`result`)
 
-Fungsi `compareGame` mengembalikan objek JSON lengkap yang siap ditampilkan ke halaman Dashboard Web atau diolah lebih lanjut:
+Struktur objek yang dikembalikan oleh fungsi `compareGame`:
 
 ```javascript
 {
@@ -63,17 +63,17 @@ Fungsi `compareGame` mengembalikan objek JSON lengkap yang siap ditampilkan ke h
   gameId: "free-fire",
   success: true,
 
-  // 1. Statistik Ringkasan (Sangat cocok untuk Card / Widget Dashboard)
+  // Ringkasan status toko (total, berhasil, gagal)
   summary: {
     totalStores: 12,
     successfulStores: 12,
     failedStores: 0,
   },
 
-  // 2. Path File Excel (Sangat cocok untuk Tombol "Download Dokumen Excel")
+  // Path file Excel yang diekspor
   xlsxFilePath: "C:/.../downloads/scrape-free-fire.xlsx",
 
-  // 3. Status Detail Tiap Toko (Sangat cocok untuk Tabel Monitoring / Audit)
+  // Status dan URL masing-masing toko
   stores: [
     {
       name: "UPoint",
@@ -101,7 +101,7 @@ Fungsi `compareGame` mengembalikan objek JSON lengkap yang siap ditampilkan ke h
     // ... toko kompetitor lainnya
   ],
 
-  // 4. Tabel Komparasi Lengkap (Sangat cocok untuk Tabel Data Utama Dashboard)
+  // Tabel perbandingan harga produk, benchmark terendah/tertinggi, selisih, dan persentase
   comparisonTable: [
     {
       Produk: "5 Diamonds",
@@ -110,7 +110,6 @@ Fungsi `compareGame` mengembalikan objek JSON lengkap yang siap ditampilkan ke h
       "itemku.com": 796,
       "kiosgamer.co.id": 1000,
       "codashop.com": 901,
-      // Analisis Benchmark Pasar
       "Harga Terendah | UPoint": 1000,
       "Harga Terendah | UPoint Selisih": 204,
       "Harga Terendah | UPoint %": "20.4000%",
