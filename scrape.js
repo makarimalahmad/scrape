@@ -11,6 +11,7 @@ const {
   pageShowsCloudflareChallenge,
 } = require("./lib/anti-bot/cloudflare");
 const {
+  getRealBrowserDomains,
   REAL_BROWSER_DOMAINS,
   scrapeWithRealBrowser,
 } = require("./lib/anti-bot/real-browser");
@@ -211,8 +212,9 @@ async function scrape(url, selector, headed, options = {}) {
   }
   const domain = url.hostname.replace(/^www\./, "");
 
-  // 1. Delegasi ke Real Browser untuk domain khusus Turnstile
-  if (REAL_BROWSER_DOMAINS.includes(domain)) {
+  // 1. Delegasi ke Real Browser jika domain dikonfigurasi fast-track di ENV
+  const fastTrackDomains = getRealBrowserDomains();
+  if (fastTrackDomains.includes(domain)) {
     try {
       const realRows = await scrapeWithRealBrowser(url, selector, headed, options);
       if (realRows && realRows.length) {
@@ -434,12 +436,15 @@ async function scrape(url, selector, headed, options = {}) {
 
     // Auto-fallback ke Real Browser jika Playwright gagal karena proteksi Cloudflare atau API timeout
     if (
-      !REAL_BROWSER_DOMAINS.includes(domain) &&
-      /cloudflare|api produk|challenge|blocked|just a moment/i.test(error.message)
+      !options._realBrowserRetried &&
+      /cloudflare|api produk|challenge|blocked|just a moment|turnstile/i.test(error.message)
     ) {
       try {
         console.log(`[Real Browser Fallback] Mencoba pemulihan otomatis via Real Browser untuk ${domain}...`);
-        const fallbackRows = await scrapeWithRealBrowser(url, selector, headed, options);
+        const fallbackRows = await scrapeWithRealBrowser(url, selector, headed, {
+          ...options,
+          _realBrowserRetried: true,
+        });
         if (fallbackRows && fallbackRows.length) {
           return fallbackRows;
         }
