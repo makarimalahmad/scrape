@@ -332,13 +332,24 @@ async function scrape(url, selector, headed, options = {}) {
     }
 
     if (hasCloudflare) {
-      if (!usedProxy && parseProxy()) {
+      const canFallbackToProxy =
+        !usedProxy &&
+        !options.disableProxy &&
+        !options.forceProxy &&
+        !options._proxyRetried &&
+        Boolean(options.proxy ? parseProxy(options.proxy) : parseProxy());
+
+      if (canFallbackToProxy) {
         console.log(
           `[Proxy] Akses ke ${domain} terblokir (HTTP ${response?.status() || "Cloudflare"}). Mencoba ulang otomatis menggunakan proxy...`,
         );
         await context.close().catch(() => {});
         if (ownsBrowser) await browser.close().catch(() => {});
-        return await scrape(url, selector, headed, { ...options, forceProxy: true });
+        return await scrape(url, selector, headed, {
+          ...options,
+          forceProxy: true,
+          _proxyRetried: true,
+        });
       }
 
       const challenge = await solveCloudflareChallenge(page, {
@@ -346,13 +357,17 @@ async function scrape(url, selector, headed, options = {}) {
         maxClicks: options.maxCloudflareClicks ?? 4,
       });
       if (!challenge.passed) {
-        if (!usedProxy && parseProxy()) {
+        if (canFallbackToProxy) {
           console.log(
             `[Proxy] Verifikasi Cloudflare tidak selesai di ${domain}. Mencoba ulang menggunakan proxy...`,
           );
           await context.close().catch(() => {});
           if (ownsBrowser) await browser.close().catch(() => {});
-          return await scrape(url, selector, headed, { ...options, forceProxy: true });
+          return await scrape(url, selector, headed, {
+            ...options,
+            forceProxy: true,
+            _proxyRetried: true,
+          });
         }
 
         const message = challenge.clickLimitReached
