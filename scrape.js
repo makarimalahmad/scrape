@@ -229,6 +229,12 @@ async function scrape(url, selector, headed, options = {}) {
   ) {
     url.searchParams.set("region", "ff_id");
   }
+  if (url.hostname.endsWith("bangjeff.com")) {
+    const cleanedPath = url.pathname.replace(/^\/(?:en-[a-z]{2}|[a-z]{2}-[a-z]{2}|en|th|my)(?=\/|$)/i, "");
+    if (cleanedPath !== url.pathname) {
+      url.pathname = cleanedPath || "/";
+    }
+  }
   const domain = url.hostname.replace(/^www\./, "");
 
   // 1. Delegasi ke Real Browser untuk domain khusus Turnstile
@@ -290,9 +296,24 @@ async function scrape(url, selector, headed, options = {}) {
     try {
       response = await page.goto(url.href, {
         waitUntil: "domcontentloaded",
-        timeout: 90_000,
+        timeout: usedProxy ? 25_000 : 90_000,
       });
     } catch (error) {
+      if (
+        usedProxy &&
+        /timeout|err_tunnel|err_proxy|err_connection|econnreset|socket hang up/i.test(
+          error.message,
+        )
+      ) {
+        const proxyServerClean = proxyConfig?.server
+          ? proxyConfig.server.replace(/^https?:\/\//, "")
+          : "proxy";
+        const proxyErrMsg = `[Proxy Error] Proxy (${proxyServerClean}) tidak merespons / gagal terhubung!`;
+        console.log(proxyErrMsg);
+        const proxyError = new Error(proxyErrMsg);
+        proxyError.proxyFailed = true;
+        throw proxyError;
+      }
       if (error.message.includes("ERR_TIMED_OUT")) {
         throw new Error("Koneksi ke situs timeout (ERR_TIMED_OUT)");
       }
