@@ -117,6 +117,7 @@ function createScrapeRows(gameConfig, ranking, mainStores, competitors) {
 
   const rows = [];
   for (const anchor of anchors) {
+    // Cari toko kompetitor mana aja yang punya nominal produk ini
     const entries = [];
     for (const rankedStore of ranking) {
       const storeKey = rankedStore.store || rankedStore.title;
@@ -124,12 +125,18 @@ function createScrapeRows(gameConfig, ranking, mainStores, competitors) {
       const product = competitorMatches.get(storeKey)?.get(anchor.id);
       if (store && product) entries.push({ store, product });
     }
+    // Kalau nggak ada kompetitor yang jual nominal ini, lewati
     if (!entries.length) continue;
 
+    // Cari harga paling murah dan paling mahal di kompetitor
     const lowest = selectBenchmark(entries, "lowest");
     const highest = selectBenchmark(entries, "highest");
+
+    // Ambil harga toko utama kita (UPoint & DuniaGames)
     const upoint = anchor.mainProducts.get("UPoint");
     const duniaGames = anchor.mainProducts.get("DuniaGames");
+
+    // Hitung selisih harga dan persen ke harga termurah & termahal
     const upointLowest = calculateComparison(upoint, lowest);
     const duniaGamesLowest = calculateComparison(duniaGames, lowest);
     const upointHighest = calculateComparison(upoint, highest);
