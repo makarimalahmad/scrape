@@ -40,6 +40,7 @@ const {
   extractProductPairsFromJson,
 } = require("./lib/extractors/generic-extractor");
 const {
+  normalizeFunnerlifeUrl,
   normalizeMobapayProductName,
   normalizeTokopediaUrl,
   parseBlibliOptionText,
@@ -454,7 +455,7 @@ async function scrape(url, selector, headed, options = {}) {
 }
 
 async function main() {
-  const url = normalizeTokopediaUrl(await getUrl());
+  const url = normalizeFunnerlifeUrl(normalizeTokopediaUrl(await getUrl()));
   const selector = getArgument("selector", DEFAULT_SELECTOR);
   const output = getArgument("output", createOutputName(url));
   const headed = process.argv.includes("--headed");
