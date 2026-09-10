@@ -25,6 +25,7 @@ const {
   extractGopayRows,
   extractHiddengameRows,
   extractKiosgamerRows,
+  extractMobapayRows,
   extractRobloxRows,
   extractShopeeRows,
   extractTokopediaRows,
@@ -148,14 +149,6 @@ async function triggerStoreSpecificInteractions(page, url) {
     if (await closeCoupon.count()) {
       await closeCoupon.click().catch(() => {});
       await page.waitForTimeout(500);
-    }
-  }
-
-  if (url.hostname.endsWith("mobapay.com")) {
-    const expandButton = page.locator(".mobapay-scroll-recharge-arrow").first();
-    if (await expandButton.count()) {
-      await expandButton.click().catch(() => {});
-      await page.waitForTimeout(1_500);
     }
   }
 
