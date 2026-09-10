@@ -1,4 +1,5 @@
 require("dotenv").config({ quiet: true });
+const path = require("path");
 const { chromium } = require("./lib/browser/playwright");
 const { scrape, exportCsv, saveInvalidReport } = require("./scrape");
 const { validateScrapeResults } = require("./lib/validation/validate-results");
@@ -356,12 +357,21 @@ async function compareGame(gameId, options = {}) {
   });
 
   let xlsxFilePath = null;
-  if (options.exportXlsxDirectory && comparisonRows.length > 0) {
+  const exportDir =
+    options.exportXlsxDirectory ||
+    path.join(
+      process.cwd(),
+      "output",
+      new Date().toISOString().slice(0, 10),
+      "comparison",
+      gameConfig.id,
+    );
+  if (comparisonRows.length > 0) {
     xlsxFilePath = await exportScrapeXlsx(
       gameConfig,
       competitors,
       comparisonRows,
-      options.exportXlsxDirectory,
+      exportDir,
     );
   }
 

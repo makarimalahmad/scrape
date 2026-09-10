@@ -133,10 +133,17 @@ Secara default, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dar
 const result = await compareGame("free-fire", {
   limit: 10,
   calculateTax: {
-    "codashop.com": 1.11,                               // PPN 11%
-    "unipin.com": 1.11,                                 // PPN 11%
-    "itemku.com": 1.007,                                // Biaya QRIS 0.7%
-    "ditusi.co.id": (price) => (price * 1.11) * 1.007, // Gabungan PPN 11% + QRIS 0.7%
+    // Tarif flat semua game (langsung angka pengali):
+    "unipin.com": 1.11,       // PPN 11%
+    "itemku.com": 1.007,      // Biaya QRIS 0.7%
+    "ditusi.co.id": 1.11777,  // Gabungan PPN 11% + QRIS 0.7%
+
+    // Tarif berbeda per game (murni sub-dictionary):
+    "codashop.com": {
+      "mobile-legends": 1.11, // PPN 11% untuk MLBB
+      "free-fire": 1.11,      // PPN 11% untuk Free Fire
+      // roblox tidak ditulis = otomatis tanpa PPN (harga normal)
+    },
   },
 });
 ```
