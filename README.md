@@ -17,7 +17,13 @@ npm install @makarimalahmad/price-scraper-sdk
 Buat atau tambahkan variabel berikut di file `.env` aplikasi Anda:
 ```env
 SERPAPI_KEY=your_serpapi_key_here
-GROQ_API_KEY=your_groq_api_key_here   # Opsional: fallback AI jika DOM toko berubah
+
+# Opsional: Fallback AI universal (Mendukung provider OpenAI-compatible apa pun)
+AI_API_KEY=your_ai_api_key_here
+AI_BASE_URL=https://api.openai.com/v1/chat/completions # contoh endpoint (OpenAI / DeepSeek / Groq / OpenRouter)
+AI_MODEL=gpt-4o-mini                                  # contoh model (gpt-4o-mini / deepseek-chat / llama-3.3-70b-versatile)
+
+# Opsional: Proxy untuk bypass proteksi IP datacenter
 PROXY_URL=http://user:pass@host:port  # Opsional: untuk bypass proteksi IP datacenter
 ```
 
@@ -226,8 +232,8 @@ Setiap toko pada array `result.stores` memiliki status terstandarisasi:
 | Status | Keterangan |
 | :--- | :--- |
 | **`SUCCESS`** | Berhasil diekstrak murni melalui struktur DOM/HTML toko (`reason: null`). |
-| **`SUCCESS_FALLBACK`** | Berhasil dipulihkan oleh Groq AI Fallback saat DOM awal kurang lengkap. |
-| **`FAILED_FALLBACK`** | Gagal setelah dicoba via DOM dan Groq AI Fallback. |
+| **`SUCCESS_FALLBACK`** | Berhasil dipulihkan oleh AI Fallback saat DOM awal kurang lengkap. |
+| **`FAILED_FALLBACK`** | Gagal setelah dicoba via DOM dan AI Fallback. |
 | **`FAILED`** | Gagal teknis (timeout jaringan, blokir keamanan, atau kendala API). |
 
 ---

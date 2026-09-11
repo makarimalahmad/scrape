@@ -1,7 +1,7 @@
 const { chromium } = require("./lib/browser/playwright");
 const readline = require("readline/promises");
 const { validateScrapeResults } = require("./lib/validation/validate-results");
-const { extractWithGroq } = require("./lib/extractors/ai-extractor");
+const { extractWithAi } = require("./lib/extractors/ai-extractor");
 
 // Modular internal libraries
 const { parseProxy, getProxyForUrl } = require("./lib/proxy/proxy-manager");
@@ -366,7 +366,7 @@ async function scrape(url, selector, headed, options = {}) {
 
     let rows = specialRows ?? genericRows ?? [];
 
-    // 5. AI Fallback (Groq) jika data belum memadai
+    // 5. AI Fallback jika data belum memadai
     let usedAiFallback = false;
     const detectedGame =
       options.game ||
@@ -380,27 +380,30 @@ async function scrape(url, selector, headed, options = {}) {
     const tempValidation = validateScrapeResults(url, rows, detectedGame);
     let triedAiFallback = false;
     let aiFallbackError = null;
-    if ((!rows.length || !tempValidation.valid || rows.length < 4) && process.env.GROQ_API_KEY) {
+    const hasAiConfigured = Boolean(
+      process.env.AI_API_KEY && process.env.AI_BASE_URL && process.env.AI_MODEL,
+    );
+    if ((!rows.length || !tempValidation.valid || rows.length < 4) && hasAiConfigured) {
       triedAiFallback = true;
       try {
-        console.log("Ekstraksi standar belum lengkap, mencoba Groq AI fallback...");
+        console.log("Ekstraksi standar belum lengkap, mencoba AI fallback...");
         const pageText = await page.evaluate(() => document.body?.innerText || "");
-        const aiRows = await extractWithGroq(pageText, detectedGame || options.game || "");
+        const aiRows = await extractWithAi(pageText, detectedGame || options.game || "");
         if (aiRows && aiRows.length >= (rows.length || 1)) {
-          console.log(`[Groq AI] Berhasil mengekstrak ${aiRows.length} produk!`);
+          console.log(`[AI Fallback] Berhasil mengekstrak ${aiRows.length} produk!`);
           rows = aiRows;
           usedAiFallback = true;
         }
       } catch (err) {
         aiFallbackError = err.message;
-        console.log("[Groq AI] Fallback dilewati:", err.message);
+        console.log("[AI Fallback] Fallback dilewati:", err.message);
       }
     }
 
     if (!rows.length) {
       const err = new Error(
         triedAiFallback && !aiFallbackError
-          ? "Ekstraksi standar dan Groq AI Fallback keduanya tidak menemukan data harga pada halaman ini."
+          ? "Ekstraksi standar dan AI Fallback keduanya tidak menemukan data harga pada halaman ini."
           : "Data harga tidak ditemukan pada halaman ini.",
       );
       err.triedAiFallback = triedAiFallback;

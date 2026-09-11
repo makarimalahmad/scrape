@@ -460,7 +460,7 @@ async function processGame(apiKey, gameConfig, options) {
       productCount: store.products.size,
       status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
       reason: store.usedAiFallback
-        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
         : null,
     })),
     ...competitors.map((store) => ({
@@ -472,7 +472,7 @@ async function processGame(apiKey, gameConfig, options) {
       productCount: store.products.size,
       status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
       reason: store.usedAiFallback
-        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
         : null,
     })),
     ...failedMainStores.map((store) => ({

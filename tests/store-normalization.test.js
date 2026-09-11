@@ -1,6 +1,6 @@
 const assert = require("assert");
 const { normalizeStoreUrl, classifyTopUpCompetitorResult } = require("../lib/google/google-search");
-const { parseRobloxProduct } = require("../lib/matcher/product-matcher");
+const { parseRobloxProduct, parseDiamondProduct } = require("../lib/matcher/product-matcher");
 
 console.log("==================================================");
 console.log("🧪 MENJALANKAN TEST SUITE: STORE NORMALIZATION & MATCHER");
@@ -170,6 +170,30 @@ test("Matcher: SpeedCash Roblox (USD) 10 masuk kategori roblox-usd-card", () => 
   const product = parseRobloxProduct("Roblox (USD) 10");
   assert.strictEqual(product.category, "roblox-usd-card");
   assert.strictEqual(product.key, "Roblox USD 10");
+});
+
+// -------------------------------------------------------------
+// 5. Uji First Top-up Diamond Matcher
+// -------------------------------------------------------------
+test("Matcher: 1000 Diamonds First Top-up diberi label (First Top-up)", () => {
+  const product = parseDiamondProduct("1000 Diamonds First Top-up");
+  assert.strictEqual(product.category, "diamond-first-topup");
+  assert.strictEqual(product.key, "1000 Diamonds (First Top-up)");
+  assert.strictEqual(product.quantity, 1000);
+});
+
+test("Matcher: 1000 Diamonds Pembelian Pertama diberi label (First Top-up)", () => {
+  const product = parseDiamondProduct("1000 Diamonds Pembelian Pertama");
+  assert.strictEqual(product.category, "diamond-first-topup");
+  assert.strictEqual(product.key, "1000 Diamonds (First Top-up)");
+  assert.strictEqual(product.quantity, 1000);
+});
+
+test("Matcher: 1000 Diamonds biasa tetap tanpa label", () => {
+  const product = parseDiamondProduct("1000 Diamonds");
+  assert.strictEqual(product.category, "diamond");
+  assert.strictEqual(product.key, "1000 Diamonds");
+  assert.strictEqual(product.quantity, 1000);
 });
 
 console.log("==================================================");

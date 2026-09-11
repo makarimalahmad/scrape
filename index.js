@@ -33,7 +33,7 @@ const {
   parsePrice,
   selectCheapestProducts,
 } = require("./lib/matcher/product-matcher");
-const { extractWithGroq } = require("./lib/extractors/ai-extractor");
+const { extractWithAi } = require("./lib/extractors/ai-extractor");
 
 /**
  * Scrape price data from a single store URL.
@@ -388,7 +388,7 @@ async function compareGame(gameId, options = {}) {
       if (success) {
         status = s.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS";
         reason = s.usedAiFallback
-          ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh Groq AI Fallback"
+          ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
           : null;
       } else if (String(s.error || "").toLowerCase().includes("fallback")) {
         status = "FAILED_FALLBACK";
@@ -439,7 +439,7 @@ module.exports = {
 
   // Validation & AI Engines
   validateScrapeResults,
-  extractWithGroq,
+  extractWithAi,
 
   // SerpAPI & Google Ranking
   searchGoogle,
