@@ -11,20 +11,28 @@ SDK otomatisasi perbandingan harga voucher game (**Mobile Legends**, **Free Fire
 npm install @makarimalahmad/price-scraper-sdk
 ```
 
-*(Jika menggunakan GitHub Packages registry, pastikan token read package terpasang di file `.npmrc`)*
+*(Catatan: Bila menggunakan GitHub Packages registry, pasang token read package pada file `.npmrc`)*
 
 ### 2. Environment Variables (`.env`)
-Buat atau tambahkan variabel berikut di file `.env` aplikasi Anda:
+Konfigurasi variabel pada file `.env`:
 ```env
 SERPAPI_KEY=your_serpapi_key_here
 
-# Opsional: Fallback AI universal (Mendukung provider OpenAI-compatible apa pun)
-AI_API_KEY=your_ai_api_key_here
-AI_BASE_URL=https://api.openai.com/v1/chat/completions # contoh endpoint (OpenAI / DeepSeek / Groq / OpenRouter)
-AI_MODEL=gpt-4o-mini                                  # contoh model (gpt-4o-mini / deepseek-chat / llama-3.3-70b-versatile)
+# Opsional: Fallback AI jika ekstraksi DOM toko gagal / tidak lengkap
+AI_API_KEY=your_api_key_here
+AI_BASE_URL=https://.../v1/chat/completions # Endpoint API LLM
+AI_MODEL=model_name                        # Nama model
 
 # Opsional: Proxy untuk bypass proteksi IP datacenter
-PROXY_URL=http://user:pass@host:port  # Opsional: untuk bypass proteksi IP datacenter
+PROXY_URL=http://user:pass@host:port
+PROXY_DOMAINS=bangjeff.com
+
+# Opsional: Tuning performa & resource server
+SCRAPER_CONCURRENCY=3       # Jumlah tab browser paralel (Default: 3, di VPS disarankan 2)
+SCRAPER_LIMIT=10            # Jumlah kompetitor Google yang diambil (Default: 10)
+SCRAPER_MAX_ATTEMPTS=3     # Percobaan ulang per toko jika gagal (Default: 3)
+PAGE_TIMEOUT_MS=90000       # Timeout navigasi halaman web dalam milidetik (Default: 90000)
+ADDITIONAL_BLACKLIST_DOMAINS=spamdomain.com,bloganeh.id
 ```
 
 ### 3. Install Playwright Browser
@@ -133,7 +141,7 @@ Struktur objek yang dikembalikan oleh fungsi `compareGame`:
 ## ⚙️ Kustomisasi Tambahan
 
 ### 1. Kustomisasi Pajak / Biaya Toko (`calculateTax`)
-Secara default, SDK mengembalikan harga asli mentah (*raw price*) apa adanya dari website toko. Anda dapat mengoper objek **Dictionary** untuk menerapkan PPN 11%, biaya admin QRIS, atau penyesuaian harga khusus per toko:
+Secara default, SDK mengembalikan harga asli mentah (*raw price*) dari website toko. Objek **Dictionary** dapat digunakan untuk menerapkan PPN 11%, biaya admin QRIS, atau penyesuaian harga khusus per toko:
 
 ```javascript
 const result = await compareGame("free-fire", {
@@ -155,7 +163,7 @@ const result = await compareGame("free-fire", {
 ```
 
 > **Tips:** 
-> - Nama domain toko otomatis dinormalisasi oleh SDK (tanpa awalan `www.` dan berhuruf kecil), jadi Anda cukup menulis `"codashop.com"`.
+> - Nama domain toko otomatis dinormalisasi oleh SDK (tanpa awalan `www.` dan berhuruf kecil), cukup cantumkan domain seperti `"codashop.com"`.
 > - Toko lain yang tidak dicantumkan di dalam dictionary (seperti UPoint atau DuniaGames) otomatis harganya tetap normal apa adanya.
 
 ### 2. Penggunaan Proxy (`proxy`)
@@ -192,8 +200,8 @@ console.log("Status:", result.success);
 console.log("Produk:", result.products);
 ```
 
-### 2. Menjalankan via CLI / Terminal (Khusus Pengembang Repository)
-Jika Anda meng-clone repository langsung dan ingin menjalankan scraper manual dari terminal:
+### 2. Menjalankan via CLI / Terminal (Clone Repository / Cron)
+Perintah eksekusi manual via terminal saat clone repository atau setup cron:
 
 ```bash
 # Komparasi game tertentu

@@ -536,15 +536,17 @@ async function main() {
   }
 
   const headed = process.argv.includes("--headed");
-  const attemptsValue = Number(getArgument("attempts", "3"));
+  const attemptsValue = Number(getArgument("attempts", process.env.SCRAPER_MAX_ATTEMPTS || "3"));
   const maxAttempts = Number.isInteger(attemptsValue)
     ? Math.min(5, Math.max(1, attemptsValue))
     : 3;
-  const limitValue = Number(getArgument("limit", "10"));
+  const defaultLimit = process.env.SCRAPER_LIMIT || "10";
+  const limitValue = Number(getArgument("limit", defaultLimit));
   const limit = Number.isInteger(limitValue)
     ? Math.min(10, Math.max(1, limitValue))
     : 10;
-  const concurrencyValue = Number(getArgument("concurrency", headed ? "1" : "3"));
+  const defaultConcurrency = process.env.SCRAPER_CONCURRENCY || "3";
+  const concurrencyValue = Number(getArgument("concurrency", headed ? "1" : defaultConcurrency));
   const concurrency = headed
     ? 1
     : Number.isInteger(concurrencyValue)

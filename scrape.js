@@ -264,9 +264,10 @@ async function scrape(url, selector, headed, options = {}) {
 
     let response;
     try {
+      const pageTimeout = Number(options.pageTimeout || process.env.PAGE_TIMEOUT_MS) || 90_000;
       response = await page.goto(url.href, {
         waitUntil: "domcontentloaded",
-        timeout: usedProxy ? 25_000 : 90_000,
+        timeout: usedProxy ? 25_000 : pageTimeout,
       });
     } catch (error) {
       if (

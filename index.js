@@ -248,11 +248,14 @@ async function compareGame(gameId, options = {}) {
     );
   }
 
-  const limit = Math.min(10, Math.max(1, options.limit || 10));
+  const defaultLimit = Number(process.env.SCRAPER_LIMIT) || 10;
+  const limit = Math.min(10, Math.max(1, options.limit || defaultLimit));
+  const defaultConcurrency = Number(process.env.SCRAPER_CONCURRENCY) || 3;
   const concurrency = options.headed
     ? 1
-    : Math.min(4, Math.max(1, options.concurrency || 3));
-  const maxAttempts = Math.min(5, Math.max(1, options.maxAttempts || 3));
+    : Math.min(4, Math.max(1, options.concurrency || defaultConcurrency));
+  const defaultMaxAttempts = Number(process.env.SCRAPER_MAX_ATTEMPTS) || 3;
+  const maxAttempts = Math.min(5, Math.max(1, options.maxAttempts || defaultMaxAttempts));
   const headed = Boolean(options.headed);
 
   const searchResult = await searchGoogle(apiKey, gameConfig, limit);
