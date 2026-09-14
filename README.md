@@ -147,15 +147,18 @@ Secara default, SDK mengembalikan harga asli mentah (*raw price*) dari website t
 const result = await compareGame("free-fire", {
   limit: 10,
   calculateTax: {
-    // Tarif flat semua game (langsung angka pengali):
-    "unipin.com": 1.11,       // PPN 11%
-    "itemku.com": 1.007,      // Biaya QRIS 0.7%
-    "ditusi.co.id": 1.11777,  // Gabungan PPN 11% + QRIS 0.7%
+    // Format persentase string (direkomendasikan):
+    "unipin.com": "11%",        // PPN 11%
+    "itemku.com": "0.7%",       // Biaya QRIS 0.7%
+    "ditusi.co.id": "11.777%",  // Gabungan PPN 11% + QRIS 0.7%
 
-    // Tarif berbeda per game (murni sub-dictionary):
+    // Atau format angka pengali desimal (tetap didukung):
+    // "unipin.com": 1.11,
+
+    // Tarif berbeda per game (sub-dictionary):
     "codashop.com": {
-      "mobile-legends": 1.11, // PPN 11% untuk MLBB
-      "free-fire": 1.11,      // PPN 11% untuk Free Fire
+      "mobile-legends": "11%", // PPN 11% untuk MLBB
+      "free-fire": "11%",      // PPN 11% untuk Free Fire
       // roblox tidak ditulis = otomatis tanpa PPN (harga normal)
     },
   },
@@ -163,6 +166,7 @@ const result = await compareGame("free-fire", {
 ```
 
 > **Tips:** 
+> - Format persentase dapat berupa string langsung (contoh `"11%"`, `"0.7%"`) maupun angka pengali desimal (contoh `1.11`).
 > - Nama domain toko otomatis dinormalisasi oleh SDK (tanpa awalan `www.` dan berhuruf kecil), cukup cantumkan domain seperti `"codashop.com"`.
 > - Toko lain yang tidak dicantumkan di dalam dictionary (seperti UPoint atau DuniaGames) otomatis harganya tetap normal apa adanya.
 
@@ -228,7 +232,7 @@ node compare-game.js --game all
 | `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika timeout (1–5). |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
-| `calculateTax` | `object` | `null` | Dictionary aturan PPN / biaya per toko `{ "domain": multiplier/function }`. |
+| `calculateTax` | `object` | `null` | Dictionary aturan PPN / biaya per toko `{ "domain": "11%" / multiplier / function }`. |
 | `proxy` | `string` / `object` | `null` | Konfigurasi proxy opsional (`host:port:user:pass` atau `http://...`). |
 
 ---

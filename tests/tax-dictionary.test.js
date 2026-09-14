@@ -270,6 +270,54 @@ test("Edge Case: nilai invalid / NaN / negatif ditolak secara aman", () => {
   assert.strictEqual(r2, 10000, "Angka negatif harus mengembalikan harga asli");
 });
 
+// -------------------------------------------------------------
+// 8. Uji Format String Persentase (misal "11%", "0.7%", "11.777%")
+// -------------------------------------------------------------
+test("String Persentase: '11%' menghasilkan penambahan PPN 11%", () => {
+  const taxDict = { "unipin.com": "11%" };
+  const payload = { rawPrice: 100000, domain: "unipin.com", game: "mobile-legends" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 111000);
+});
+
+test("String Persentase: '0.7%' menghasilkan penambahan biaya QRIS 0.7%", () => {
+  const taxDict = { "itemku.com": "0.7%" };
+  const payload = { rawPrice: 100000, domain: "itemku.com", game: "free-fire" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 100700);
+});
+
+test("String Persentase: desimal presisi tinggi '11.777%'", () => {
+  const taxDict = { "ditusi.co.id": "11.777%" };
+  const payload = { rawPrice: 100000, domain: "ditusi.co.id", game: "roblox" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 111777);
+});
+
+test("String Persentase: Nested per game dengan '11%'", () => {
+  const taxDict = {
+    "codashop.com": {
+      "mobile-legends": "11%",
+      "default": "0%",
+    },
+  };
+  const rMlbb = applyTaxCalculation(taxDict, { rawPrice: 50000, domain: "codashop.com", game: "mobile-legends" });
+  const rOther = applyTaxCalculation(taxDict, { rawPrice: 50000, domain: "codashop.com", game: "roblox" });
+  assert.strictEqual(rMlbb, 55500);
+  assert.strictEqual(rOther, 50000);
+});
+
+test("String Persentase: string persentase invalid / rusak mengembalikan harga asli", () => {
+  const taxDict = {
+    "bad1.com": "abc%",
+    "bad2.com": "-10%",
+    "bad3.com": "%",
+  };
+  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad1.com" }), 10000);
+  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad2.com" }), 10000);
+  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad3.com" }), 10000);
+});
+
 console.log("==================================================");
 console.log(`HASIL: ${testsPassed} Berhasil, ${testsFailed} Gagal`);
 console.log("==================================================");
