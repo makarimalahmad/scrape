@@ -318,6 +318,51 @@ test("String Persentase: string persentase invalid / rusak mengembalikan harga a
   assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad3.com" }), 10000);
 });
 
+// -------------------------------------------------------------
+// 9. Uji Format Angka Murni & String Tanpa Simbol % (12.11, 11, 0.7, "12.11")
+// -------------------------------------------------------------
+test("Angka Murni: 12.11 (number) otomatis dianggap 12.11%", () => {
+  const taxDict = { "codashop.com": 12.11 };
+  const payload = { rawPrice: 100000, domain: "codashop.com", game: "mobile-legends" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 112110);
+});
+
+test("Angka Murni: 11 (number) otomatis dianggap 11%", () => {
+  const taxDict = { "unipin.com": 11 };
+  const payload = { rawPrice: 100000, domain: "unipin.com", game: "free-fire" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 111000);
+});
+
+test("Angka Murni: 0.7 (number desimal < 1) otomatis dianggap 0.7%", () => {
+  const taxDict = { "itemku.com": 0.7 };
+  const payload = { rawPrice: 100000, domain: "itemku.com", game: "free-fire" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 100700);
+});
+
+test("String Tanpa %: '12.11' (string) otomatis dianggap 12.11%", () => {
+  const taxDict = { "codashop.com": "12.11" };
+  const payload = { rawPrice: 100000, domain: "codashop.com", game: "mobile-legends" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 112110);
+});
+
+test("String Tanpa %: '0.7' (string) otomatis dianggap 0.7%", () => {
+  const taxDict = { "itemku.com": "0.7" };
+  const payload = { rawPrice: 100000, domain: "itemku.com", game: "free-fire" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 100700);
+});
+
+test("Angka Murni: legacy multiplier 1.11 tetap berfungsi normal", () => {
+  const taxDict = { "lapaku.com": 1.11 };
+  const payload = { rawPrice: 100000, domain: "lapaku.com", game: "mobile-legends" };
+  const result = applyTaxCalculation(taxDict, payload);
+  assert.strictEqual(result, 111000);
+});
+
 console.log("==================================================");
 console.log(`HASIL: ${testsPassed} Berhasil, ${testsFailed} Gagal`);
 console.log("==================================================");
