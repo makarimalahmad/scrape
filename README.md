@@ -147,13 +147,10 @@ Secara default, SDK mengembalikan harga asli mentah (*raw price*) dari website t
 const result = await compareGame("free-fire", {
   limit: 10,
   calculateTax: {
-    // Format persentase string (direkomendasikan):
+    // Format persentase string:
     "unipin.com": "11%",        // PPN 11%
     "itemku.com": "0.7%",       // Biaya QRIS 0.7%
     "ditusi.co.id": "11.777%",  // Gabungan PPN 11% + QRIS 0.7%
-
-    // Atau format angka pengali desimal (tetap didukung):
-    // "unipin.com": 1.11,
 
     // Tarif berbeda per game (sub-dictionary):
     "codashop.com": {
@@ -166,7 +163,7 @@ const result = await compareGame("free-fire", {
 ```
 
 > **Tips:** 
-> - Format persentase dapat berupa string langsung (contoh `"11%"`, `"0.7%"`) maupun angka pengali desimal (contoh `1.11`).
+> - Cukup cantumkan nilai persentase dengan tanda `%` (contoh: `"11%"`, `"0.7%"`).
 > - Nama domain toko otomatis dinormalisasi oleh SDK (tanpa awalan `www.` dan berhuruf kecil), cukup cantumkan domain seperti `"codashop.com"`.
 > - Toko lain yang tidak dicantumkan di dalam dictionary (seperti UPoint atau DuniaGames) otomatis harganya tetap normal apa adanya.
 
@@ -232,7 +229,7 @@ node compare-game.js --game all
 | `maxAttempts` | `number` | `3` | Batas percobaan ulang (*retry*) per toko jika timeout (1–5). |
 | `headed` | `boolean` | `false` | Menampilkan jendela visual browser jika `true`. |
 | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan untuk menyimpan file Excel (.xlsx). |
-| `calculateTax` | `object` | `null` | Dictionary aturan PPN / biaya per toko `{ "domain": "11%" / multiplier / function }`. |
+| `calculateTax` | `object` | `null` | Dictionary aturan PPN / biaya per toko `{ "domain": "11%" }`. |
 | `proxy` | `string` / `object` | `null` | Konfigurasi proxy opsional (`host:port:user:pass` atau `http://...`). |
 
 ---
