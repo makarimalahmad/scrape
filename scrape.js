@@ -103,6 +103,7 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
     "hiddengame.id": "div.product-item",
     "bangjeff.com": '[class*="group/variant"]',
     "ourastore.com": '[class*="group/variant"]',
+    "lapakgaming.com": '[class*="rounded-xl"], [class*="cursor-pointer"]',
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {

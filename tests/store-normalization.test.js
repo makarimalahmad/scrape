@@ -58,12 +58,18 @@ test("Golrox: /beli-robux/username tetap tidak berubah", () => {
 });
 
 // -------------------------------------------------------------
-// 3. Uji Normalisasi URL Funnerlife (Mobile Legends)
+// 3. Uji Normalisasi URL Funnerlife & Lapakgaming
 // -------------------------------------------------------------
 test("Funnerlife: /id/beli/mlbb dinormalisasi ke /id/beli/mobile-legend", () => {
   const input = "https://funnerlife.id/id/beli/mlbb";
   const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
   assert.strictEqual(normalized.href, "https://funnerlife.id/id/beli/mobile-legend");
+});
+
+test("Lapakgaming: /id-id/roblox-login dinormalisasi ke /id-id/roblox", () => {
+  const input = "https://www.lapakgaming.com/id-id/roblox-login";
+  const normalized = normalizeStoreUrl(input, { id: "roblox" });
+  assert.strictEqual(normalized.href, "https://www.lapakgaming.com/id-id/roblox");
 });
 
 // -------------------------------------------------------------
@@ -152,6 +158,18 @@ test("Matcher: Roblox Gift Card IDR 100.000 cocok ke kategori roblox-idr-card", 
   const product = parseRobloxProduct("Roblox Gift Card IDR 100.000");
   assert.strictEqual(product.category, "roblox-idr-card");
   assert.strictEqual(product.key, "Roblox IDR 100000");
+});
+
+test("Matcher: Lapakgaming 'Roblox Gift Card IDR 50K' cocok ke 'Roblox IDR 50000'", () => {
+  const product = parseRobloxProduct("Roblox Gift Card IDR 50K");
+  assert.strictEqual(product.category, "roblox-idr-card");
+  assert.strictEqual(product.key, "Roblox IDR 50000");
+});
+
+test("Matcher: Lapakgaming 'Roblox Gift Card 50 SAR' masuk ke 'Roblox SAR 50' dan tidak tertukar ke IDR", () => {
+  const product = parseRobloxProduct("Roblox Gift Card 50 SAR");
+  assert.strictEqual(product.category, "roblox-sar-card");
+  assert.strictEqual(product.key, "Roblox SAR 50");
 });
 
 test("Matcher: 800 Robux cocok ke kategori robux", () => {
