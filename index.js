@@ -365,7 +365,7 @@ async function compareGame(gameId, options = {}) {
     path.join(
       process.cwd(),
       "output",
-      new Date().toISOString().slice(0, 10),
+      new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
       "comparison",
       gameConfig.id,
     );
