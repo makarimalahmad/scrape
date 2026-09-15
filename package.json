@@ -1,6 +1,6 @@
 {
   "name": "@makarimalahmad/price-scraper-sdk",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Scraper harga voucher game Mobile Legends, Free Fire, dan Roblox berbasis pencarian Google Organik",
   "main": "index.js",
   "scripts": {
