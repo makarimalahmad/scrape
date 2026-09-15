@@ -552,6 +552,7 @@ async function main() {
     : Number.isInteger(concurrencyValue)
       ? Math.min(4, Math.max(1, concurrencyValue))
       : 3;
+  const generatedAt = new Date().toISOString();
   const date = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
   const runDirectory = createUniqueRunDirectory(path.resolve(__dirname, "output"), date);
   const comparisonDirectory = path.join(runDirectory, "comparison");
