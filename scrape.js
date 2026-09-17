@@ -288,6 +288,9 @@ async function scrape(url, selector, headed, options = {}) {
         const proxyError = new Error(proxyErrMsg);
         proxyError.proxyFailed = true;
         proxyError.usedProxy = true;
+        if (isAuthOrQuotaFailure || options._proxyRetried) {
+          proxyError.retryable = false;
+        }
         throw proxyError;
       }
       if (error.message.includes("ERR_TIMED_OUT")) {
@@ -326,6 +329,18 @@ async function scrape(url, selector, headed, options = {}) {
           forceProxy: true,
           _proxyRetried: true,
         });
+      }
+
+      // Jika akses terblokir HTTP 403 mentah tanpa Turnstile dan tidak ada proxy di .env, langsung skip cepat
+      if (response?.status() === 403 && !canFallbackToProxy) {
+        const turnstileFrame = await findTurnstileFrame(page, 1_500);
+        if (!turnstileFrame && !(await pageShowsCloudflareChallenge(page))) {
+          const error = new Error(
+            `[Blokir] Akses ke ${domain} terblokir (HTTP 403). Tidak ada proxy terkonfigurasi di .env. Toko dilewati.`,
+          );
+          error.retryable = false;
+          throw error;
+        }
       }
 
       const challenge = await solveCloudflareChallenge(page, {
