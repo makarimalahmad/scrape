@@ -1,6 +1,6 @@
 # @makarimalahmad/price-scraper-sdk
 
-SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan Roblox) berbasis pencarian Google Organik via SerpAPI. Modul ini mengotomasi pencarian toko kompetitor, normalisasi denominasi produk terhadap toko patokan (UPoint dan DuniaGames), perhitungan margin selisih harga pasar, penyesuaian PPN atau biaya transaksi, serta ekspor hasil dalam format Excel (.xlsx) dan CSV.
+SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan Roblox) berbasis pencarian Google Organik via SerpAPI. Modul ini mengotomasi pencarian toko kompetitor, normalisasi denominasi produk terhadap toko patokan (UPoint dan DuniaGames), perhitungan perbandingan selisih harga pasar, penyesuaian PPN atau biaya transaksi, serta ekspor hasil dalam format Excel (.xlsx) dan CSV.
 
 ---
 
@@ -25,7 +25,6 @@ SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan R
 - [Status Hasil Ekstraksi](#status-hasil-ekstraksi)
 - [Penggunaan Melalui CLI](#penggunaan-melalui-cli)
 - [Pengujian](#pengujian)
-- [Lisensi](#lisensi)
 
 ---
 
@@ -416,9 +415,3 @@ Menjalankan pengujian logika kalkulasi pajak dan normalisasi toko saja:
 ```bash
 npm run test:tax
 ```
-
----
-
-## Lisensi
-
-ISC License.
