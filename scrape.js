@@ -273,17 +273,21 @@ async function scrape(url, selector, headed, options = {}) {
     } catch (error) {
       if (
         usedProxy &&
-        /timeout|err_tunnel|err_proxy|err_connection|econnreset|socket hang up/i.test(
+        /timeout|err_tunnel|err_proxy|err_connection|econnreset|socket hang up|err_http_response_code_failure/i.test(
           error.message,
         )
       ) {
         const proxyServerClean = proxyConfig?.server
           ? proxyConfig.server.replace(/^https?:\/\//, "")
           : "proxy";
-        const proxyErrMsg = `[Proxy Error] Proxy (${proxyServerClean}) tidak merespons / gagal terhubung!`;
+        const isAuthOrQuotaFailure = /err_http_response_code_failure/i.test(error.message);
+        const proxyErrMsg = isAuthOrQuotaFailure
+          ? `[Proxy Error] Proxy (${proxyServerClean}) ditolak atau kuota habis (ERR_HTTP_RESPONSE_CODE_FAILURE) saat mengakses ${domain}`
+          : `[Proxy Error] Proxy (${proxyServerClean}) tidak merespons atau gagal terhubung saat mengakses ${domain}`;
         console.log(proxyErrMsg);
         const proxyError = new Error(proxyErrMsg);
         proxyError.proxyFailed = true;
+        proxyError.usedProxy = true;
         throw proxyError;
       }
       if (error.message.includes("ERR_TIMED_OUT")) {
@@ -424,6 +428,11 @@ async function scrape(url, selector, headed, options = {}) {
     });
     Object.defineProperty(finalRows, "_usedAiFallback", {
       value: usedAiFallback,
+      enumerable: false,
+      writable: true,
+    });
+    Object.defineProperty(finalRows, "_usedProxy", {
+      value: usedProxy,
       enumerable: false,
       writable: true,
     });

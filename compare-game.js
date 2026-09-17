@@ -475,12 +475,22 @@ async function processGame(apiKey, gameConfig, options) {
   );
   const mainStores = mainResults.filter((result) => result.success).map((result) => result.store);
   const competitors = competitorResults.filter((result) => result.success).map((result) => result.store);
+  function cleanErrorMessage(rawError) {
+    if (!rawError) return null;
+    return String(rawError)
+      .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")
+      .split(/\nCall log:/i)[0]
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   const failedMainStores = mainResults
     .filter((result) => !result.success)
     .map((result) => ({
       name: result.source.name,
       url: result.source.url,
-      error: result.error.message,
+      error: cleanErrorMessage(result.error?.message || result.error),
+      usedProxy: Boolean(result.error?.usedProxy),
     }));
   const failedCompetitors = competitorResults
     .filter((result) => !result.success)
@@ -489,7 +499,8 @@ async function processGame(apiKey, gameConfig, options) {
       organicPosition: result.source.organicPosition ?? null,
       name: result.source.store,
       url: result.source.link,
-      error: result.error.message,
+      error: cleanErrorMessage(result.error?.message || result.error),
+      usedProxy: Boolean(result.error?.usedProxy),
     }));
 
   if (!mainStores.length) throw new Error(`Semua situs utama ${gameConfig.name} gagal.`);
@@ -520,6 +531,7 @@ async function processGame(apiKey, gameConfig, options) {
       reason: store.usedAiFallback
         ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
         : null,
+      usedProxy: Boolean(store.usedProxy),
     })),
     ...competitors.map((store) => ({
       name: store.name,
@@ -532,6 +544,7 @@ async function processGame(apiKey, gameConfig, options) {
       reason: store.usedAiFallback
         ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
         : null,
+      usedProxy: Boolean(store.usedProxy),
     })),
     ...failedMainStores.map((store) => ({
       name: store.name || store.store,
@@ -540,7 +553,8 @@ async function processGame(apiKey, gameConfig, options) {
       url: store.url,
       productCount: 0,
       status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
-      reason: store.error || "Gagal melakukan ekstraksi data",
+      reason: cleanErrorMessage(store.error) || "Gagal melakukan ekstraksi data",
+      usedProxy: Boolean(store.usedProxy),
     })),
     ...failedCompetitors.map((store) => ({
       name: store.name || store.store,
@@ -550,7 +564,8 @@ async function processGame(apiKey, gameConfig, options) {
       url: store.url,
       productCount: 0,
       status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
-      reason: store.error || "Gagal melakukan ekstraksi data",
+      reason: cleanErrorMessage(store.error) || "Gagal melakukan ekstraksi data",
+      usedProxy: Boolean(store.usedProxy),
     })),
   ];
 

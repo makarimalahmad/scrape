@@ -387,7 +387,14 @@ async function compareGame(gameId, options = {}) {
     stores: allStores.map((s) => {
       const success = isStoreSuccess(s);
       let status = "FAILED";
-      let reason = s.error || null;
+      let cleanReason = s.error
+        ? String(s.error)
+            .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")
+            .split(/\nCall log:/i)[0]
+            .replace(/\s+/g, " ")
+            .trim()
+        : null;
+      let reason = cleanReason;
       if (success) {
         status = s.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS";
         reason = s.usedAiFallback
@@ -395,7 +402,7 @@ async function compareGame(gameId, options = {}) {
           : null;
       } else if (String(s.error || "").toLowerCase().includes("fallback")) {
         status = "FAILED_FALLBACK";
-        reason = s.error;
+        reason = cleanReason;
       }
       return {
         name: s.name,
@@ -407,6 +414,7 @@ async function compareGame(gameId, options = {}) {
         status,
         reason,
         confidence: s.confidence || 0,
+        usedProxy: Boolean(s.usedProxy),
       };
     }),
     comparisonTable: comparisonRows,
