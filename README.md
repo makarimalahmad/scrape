@@ -1,6 +1,6 @@
 # @makarimalahmad/price-scraper-sdk
 
-[![NPM Version](https://img.shields.io/badge/version-1.0.18-blue.svg)](https://github.com/makarimalahmad/scrape/packages)
+[![NPM Version](https://img.shields.io/badge/version-1.0.19-blue.svg)](https://github.com/makarimalahmad/scrape/packages)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-yellow.svg)](https://opensource.org/licenses/ISC)
 [![Playwright](https://img.shields.io/badge/tested%20with-Playwright%20Extra-purple.svg)](https://playwright.dev/)
