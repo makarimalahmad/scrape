@@ -396,6 +396,64 @@ async function collectStore(store, gameConfig, options) {
   }
 }
 
+function printRankingTable(ranking) {
+  if (!Array.isArray(ranking) || ranking.length === 0) return;
+  const maxColumns = process.stdout.columns || 120;
+  const headers = ["No", "Toko", "Google Rank", "Tipe", "URL Target"];
+
+  const rawRows = ranking.map((r) => [
+    String(r.position),
+    r.store,
+    String(r.organicPosition ?? "-"),
+    r.isPriority ? "Priority" : "Organik",
+    r.link,
+  ]);
+
+  const colWidths = headers.map((h, i) =>
+    Math.max(h.length, ...rawRows.map((row) => row[i].length))
+  );
+
+  const fixedWidthWithoutUrl =
+    colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 16;
+  const availableForUrl = maxColumns - fixedWidthWithoutUrl;
+
+  if (availableForUrl > 15 && colWidths[4] > availableForUrl) {
+    colWidths[4] = availableForUrl;
+  }
+
+  const truncate = (str, len) => {
+    if (str.length <= len) return str;
+    return str.slice(0, len - 3) + "...";
+  };
+
+  const rows = rawRows.map((row) => [
+    row[0].padStart(colWidths[0]),
+    row[1].padEnd(colWidths[1]),
+    row[2].padStart(colWidths[2]),
+    row[3].padEnd(colWidths[3]),
+    truncate(row[4], colWidths[4]).padEnd(colWidths[4]),
+  ]);
+
+  const paddedHeaders = [
+    headers[0].padStart(colWidths[0]),
+    headers[1].padEnd(colWidths[1]),
+    headers[2].padStart(colWidths[2]),
+    headers[3].padEnd(colWidths[3]),
+    headers[4].padEnd(colWidths[4]),
+  ];
+
+  const formatLine = (items) => "│ " + items.join(" │ ") + " │";
+  const topBorder = "┌─" + colWidths.map((w) => "─".repeat(w)).join("─┬─") + "─┐";
+  const midBorder = "├─" + colWidths.map((w) => "─".repeat(w)).join("─┼─") + "─┤";
+  const botBorder = "└─" + colWidths.map((w) => "─".repeat(w)).join("─┴─") + "─┘";
+
+  console.log(topBorder);
+  console.log(formatLine(paddedHeaders));
+  console.log(midBorder);
+  rows.forEach((row) => console.log(formatLine(row)));
+  console.log(botBorder);
+}
+
 async function processGame(apiKey, gameConfig, options) {
   console.log(`\n===== Scrape ${gameConfig.name} =====`);
   const { ranking, rankingAudit } = await searchGoogle(
@@ -403,7 +461,7 @@ async function processGame(apiKey, gameConfig, options) {
     gameConfig,
     options.limit,
   );
-  console.table(ranking);
+  printRankingTable(ranking);
 
   const mainResults = await mapWithConcurrency(
     gameConfig.mainStores,
@@ -621,4 +679,5 @@ module.exports = {
   exportScrapeXlsx,
   matchStoreToAnchors,
   selectBenchmark,
+  printRankingTable,
 };
