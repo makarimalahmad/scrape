@@ -1,120 +1,125 @@
 # @makarimalahmad/price-scraper-sdk
 
-[![NPM Version](https://img.shields.io/badge/version-1.0.19-blue.svg)](https://github.com/makarimalahmad/scrape/packages)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
-[![License: ISC](https://img.shields.io/badge/License-ISC-yellow.svg)](https://opensource.org/licenses/ISC)
-[![Playwright](https://img.shields.io/badge/tested%20with-Playwright%20Extra-purple.svg)](https://playwright.dev/)
-
-SDK otomasi komparasi harga voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**) berbasis penelusuran Google Organik (SerpAPI). SDK ini memindai toko kompetitor teratas secara otomatis, menormalisasi denominasi produk terhadap toko patokan (**UPoint** & **DuniaGames**), menghitung harga terendah/tertinggi pasar, menyesuaikan PPN/biaya transaksi, serta mengekspor hasil analisis langsung ke file **Excel (.xlsx)** berformat rapi dan **CSV**.
+SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan Roblox) berbasis pencarian Google Organik via SerpAPI. Modul ini mengotomasi pencarian toko kompetitor, normalisasi denominasi produk terhadap toko patokan (UPoint dan DuniaGames), perhitungan margin selisih harga pasar, penyesuaian PPN atau biaya transaksi, serta ekspor hasil dalam format Excel (.xlsx) dan CSV.
 
 ---
 
-## 📑 Daftar Isi
+## Daftar Isi
 
-- [Fitur Utama](#-fitur-utama)
-- [Game yang Didukung](#-game-yang-didukung)
-- [Instalasi & Persiapan](#-instalasi--persiapan)
-  - [1. Konfigurasi Autentikasi (.npmrc)](#1-konfigurasi-autentikasi-npmrc)
-  - [2. Install Package](#2-install-package)
-  - [3. Install Browser Playwright](#3-install-browser-playwright)
-- [Konfigurasi Environment (.env)](#-konfigurasi-environment-env)
-- [Quick Start](#-quick-start)
-- [Dokumentasi API Publik](#-dokumentasi-api-publik)
-  - [1. `compareGame(gameId, options)`](#1-comparegamegameid-options)
-  - [2. `compareUrls(mainUrl, competitorUrl, options)`](#2-compareurlsmainurl-competitorurl-options)
-  - [3. `scrapeUrl(url, options)`](#3-scrapeurlurl-options)
-  - [4. `applyTaxCalculation(taxRules, payload)`](#4-applytaxcalculationtaxrules-payload)
-- [Struktur Return Object `compareGame`](#-struktur-return-object-comparegame)
-- [Kustomisasi Pajak & Biaya Toko (`calculateTax`)](#-kustomisasi-pajak--biaya-toko-calculatetax)
-- [Dukungan Proxy](#-dukungan-proxy)
-- [Status Ekstraksi Toko](#-status-ekstraksi-toko)
-- [Penggunaan via CLI / Terminal](#-penggunaan-via-cli--terminal)
-- [Pengujian & Verifikasi](#-pengujian--verifikasi)
-
----
-
-## ✨ Fitur Utama
-
-- **Peringkat Organik Asli**: Mengambil posisi kompetitor top-up game langsung dari Google Search via SerpAPI.
-- **Normalisasi Produk Cerdas**: Pencocokan varian denominasi (misal: "Weekly Diamond Pass", "86 Diamonds", "Robux Game Card") lintas toko yang memiliki format penamaan berbeda.
-- **Anchor Patokan Toko Utama**: Membandingkan langsung selisih harga (Rp dan %) terhadap patokan resmi **UPoint** dan **DuniaGames**.
-- **Anti-Bot & Cloudflare Bypass**: Terintegrasi dengan `playwright-extra`, plugin stealth, dan penanganan Turnstile otomatis.
-- **Ekspor Excel Siap Pakai**: Otomatis menghasilkan workbook Excel `.xlsx` dengan styling tabel, highlight harga terendah/tertinggi, dan rumus perbandingan.
-- **AI Fallback (Opsional)**: Pemulihan data otomatis berbasis LLM jika struktur DOM toko tidak lazim atau berubah.
-- **Penyesuaian Pajak/Admin**: Perhitungan PPN (11%) atau biaya pembayaran (QRIS) dinamis per domain toko atau per game.
+- [Fitur](#fitur)
+- [Game yang Didukung](#game-yang-didukung)
+- [Instalasi](#instalasi)
+  - [Autentikasi GitHub Packages (.npmrc)](#autentikasi-github-packages-npmrc)
+  - [Instalasi Paket](#instalasi-paket)
+  - [Instalasi Dependensi Browser](#instalasi-dependensi-browser)
+- [Konfigurasi Lingkungan (.env)](#konfigurasi-lingkungan-env)
+- [Panduan Penggunaan](#panduan-penggunaan)
+- [Referensi API](#referensi-api)
+  - [compareGame(gameId, options)](#comparegamegameid-options)
+  - [compareUrls(mainUrl, competitorUrl, options)](#compareurlsmainurl-competitorurl-options)
+  - [scrapeUrl(url, options)](#scrapeurlurl-options)
+  - [applyTaxCalculation(taxRules, payload)](#applytaxcalculationtaxrules-payload)
+- [Struktur Data Return](#struktur-data-return)
+- [Penyesuaian Pajak dan Biaya Toko](#penyesuaian-pajak-dan-biaya-toko)
+- [Konfigurasi Proxy](#konfigurasi-proxy)
+- [Status Hasil Ekstraksi](#status-hasil-ekstraksi)
+- [Penggunaan Melalui CLI](#penggunaan-melalui-cli)
+- [Pengujian](#pengujian)
+- [Lisensi](#lisensi)
 
 ---
 
-## 🎮 Game yang Didukung
+## Fitur
 
-| Game | `gameId` | Toko Patokan Utama | Denominasi / Mata Uang |
+- **Peringkat Google Organik**: Mengambil peringkat toko kompetitor langsung dari hasil pencarian Google Indonesia melalui SerpAPI.
+- **Normalisasi Denominasi**: Memetakan varian nama produk (misal: "Weekly Diamond Pass", "86 Diamonds", "Robux Game Card") ke format standar agar dapat dibandingkan secara akurat.
+- **Komparasi Toko Patokan**: Menghitung selisih nominal (Rp) dan persentase (%) terhadap toko patokan resmi (UPoint dan DuniaGames).
+- **Penanganan Anti-Bot**: Menggunakan Playwright Extra dengan plugin stealth dan penanganan Cloudflare Turnstile.
+- **Fail-Fast Resilient**: Melewati toko secara langsung apabila akses diblokir (HTTP 403) atau konfigurasi proxy mengalami kegagalan autentikasi, guna mencegah penundaan proses.
+- **Ekspor Data**: Menghasilkan file Excel (.xlsx) terformat dengan penanda harga terendah dan tertinggi, serta file CSV mentah.
+- **Penyesuaian Biaya Transaksi**: Mendukung kalkulasi PPN (11%) atau biaya pembayaran (QRIS) per domain toko atau per game.
+
+---
+
+## Game yang Didukung
+
+| Game | ID Game (`gameId`) | Toko Patokan Utama | Denominasi yang Dinormalisasi |
 | :--- | :--- | :--- | :--- |
-| **Mobile Legends: Bang Bang** | `mobile-legends` | UPoint, DuniaGames | Diamonds, WDP, Twilight Pass |
-| **Free Fire** | `free-fire` | UPoint, DuniaGames | Diamonds, Membership |
-| **Roblox** | `roblox` | UPoint, DuniaGames | Robux, Game Card, Gift Card |
+| Mobile Legends: Bang Bang | `mobile-legends` | UPoint, DuniaGames | Diamonds, Weekly Diamond Pass, Twilight Pass |
+| Free Fire | `free-fire` | UPoint, DuniaGames | Diamonds, Membership Mingguan/Bulanan |
+| Roblox | `roblox` | UPoint, DuniaGames | Robux, Roblox Gift Card / Game Card (IDR & USD) |
 
 ---
 
-## 📦 Instalasi & Persiapan
+## Instalasi
 
-### 1. Konfigurasi Autentikasi (`.npmrc`)
+### Autentikasi GitHub Packages (.npmrc)
 
-Paket ini dipublikasikan pada **GitHub Packages**. Sebelum menginstal, buat atau tambahkan file `.npmrc` pada root project Anda (atau di direktori home pengguna `~/.npmrc`):
+Paket ini di-hosting pada **GitHub Packages** (`npm.pkg.github.com`). 
+
+Kebijakan GitHub mewajibkan autentikasi menggunakan **Personal Access Token (PAT)** untuk seluruh proses pengunduhan paket dari GitHub Packages, meskipun repositori publik. Tanpa token autentikasi, perintah instalasi akan mengembalikan error `401 Unauthorized`.
+
+Buat atau tambahkan konfigurasi berikut pada file `.npmrc` di root project Anda (atau pada file global `~/.npmrc` di direktori user):
 
 ```ini
 @makarimalahmad:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
+//npm.pkg.github.com/:_authToken=GITHUB_PERSONAL_ACCESS_TOKEN
 ```
 
-> [!NOTE]
-> Ganti `YOUR_GITHUB_PERSONAL_ACCESS_TOKEN` dengan token GitHub Anda yang memiliki permission **`read:packages`**.
+> **Catatan Token:** Ganti `GITHUB_PERSONAL_ACCESS_TOKEN` dengan token akun GitHub Anda yang memiliki hak akses (*permission scope*) **`read:packages`**.
 
-### 2. Install Package
+### Instalasi Paket
+
+Jalankan perintah berikut pada terminal proyek:
 
 ```bash
 npm install @makarimalahmad/price-scraper-sdk
 ```
 
-### 3. Install Browser Playwright
+### Instalasi Dependensi Browser
 
-SDK membutuhkan Chromium untuk scraping. Jalankan perintah berikut satu kali setelah instalasi:
+SDK ini memerlukan Chromium yang dikelola oleh Playwright. Jalankan instalasi biner browser setelah paket terpasang:
 
 ```bash
 npx playwright install chromium
 ```
 
-*(Jika dijalankan pada server Ubuntu/Debian, tambahkan dependensi OS: `npx playwright install-deps chromium`)*
+Untuk server berbasis Linux (Ubuntu/Debian) tanpa GUI, jalankan perintah berikut untuk melengkapi pustaka sistem yang diperlukan:
 
----
-
-## 🔐 Konfigurasi Environment (`.env`)
-
-Buat file `.env` di root project Anda:
-
-```env
-# WAJIB: API key SerpAPI untuk membaca hasil pencarian Google kompetitor
-SERPAPI_KEY=your_serpapi_key_here
-
-# OPSIONAL: AI Fallback jika ekstraksi DOM toko gagal / tidak lengkap
-AI_API_KEY=your_llm_api_key_here
-AI_BASE_URL=https://api.openai.com/v1/chat/completions
-AI_MODEL=gpt-4o-mini
-
-# OPSIONAL: Pengaturan Proxy Global
-PROXY_URL=http://username:password@proxy-host:port
-PROXY_DOMAINS=bangjeff.com,tokogame.com
-
-# OPSIONAL: Tuning Performa Scraper
-SCRAPER_CONCURRENCY=3       # Tab paralel (Default: 3, di VPS disarankan 2)
-SCRAPER_LIMIT=10            # Jumlah toko kompetitor Google (Default: 10, Maks: 10)
-SCRAPER_MAX_ATTEMPTS=3     # Jumlah percobaan ulang per toko (Default: 3, Maks: 5)
-PAGE_TIMEOUT_MS=90000       # Timeout navigasi per halaman web dalam ms (Default: 90000)
-ADDITIONAL_BLACKLIST_DOMAINS=spamdomain.com,bloganeh.id
+```bash
+npx playwright install-deps chromium
 ```
 
 ---
 
-## 🚀 Quick Start
+## Konfigurasi Lingkungan (.env)
+
+Definisikan variabel lingkungan pada file `.env` di root direktori aplikasi:
+
+```env
+# Kredensial SerpAPI (Wajib untuk fungsi compareGame)
+SERPAPI_KEY=kunci_serpapi_anda
+
+# Konfigurasi LLM AI Fallback (Opsional: pemulihan otomatis jika DOM toko berubah)
+AI_API_KEY=kunci_api_llm_anda
+AI_BASE_URL=https://api.openai.com/v1/chat/completions
+AI_MODEL=gpt-4o-mini
+
+# Konfigurasi Proxy (Opsional: digunakan untuk toko yang memblokir IP datacenter)
+PROXY_URL=http://username:password@proxy-host:port
+PROXY_DOMAINS=bangjeff.com,tokogame.com
+
+# Parameter Runtime Scraper (Opsional)
+SCRAPER_CONCURRENCY=3       # Jumlah tab browser paralel (Default: 3, di VPS disarankan 2)
+SCRAPER_LIMIT=10            # Jumlah kompetitor Google yang diproses (Default: 10, Maksimal: 10)
+SCRAPER_MAX_ATTEMPTS=3     # Batas percobaan ulang per toko jika terjadi timeout jaringan (Default: 3)
+PAGE_TIMEOUT_MS=90000       # Batas waktu muat halaman dalam milidetik (Default: 90000)
+ADDITIONAL_BLACKLIST_DOMAINS=domainiklan.com,blogpribadi.id
+```
+
+---
+
+## Panduan Penggunaan
 
 Contoh eksekusi komparasi harga otomatis untuk game **Free Fire**:
 
@@ -123,16 +128,16 @@ const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
 async function main() {
   const result = await compareGame("free-fire", {
-    limit: 10,                          // Ambil 10 toko kompetitor teratas Google
-    concurrency: 3,                      // 3 browser tab paralel
-    exportXlsxDirectory: "./output",     // Simpan file Excel ke folder ./output
+    limit: 10,
+    concurrency: 3,
+    exportXlsxDirectory: "./output",
   });
 
   console.log(`Game: ${result.game}`);
-  console.log(`Toko Berhasil: ${result.successfulStoreCount}/${result.storeCount}`);
-  console.log(`File Excel: ${result.xlsxFilePath}`);
+  console.log(`Status Toko: ${result.successfulStoreCount}/${result.storeCount} berhasil`);
+  console.log(`Lokasi File Excel: ${result.xlsxFilePath}`);
 
-  // Tampilkan 3 produk pertama dari summary harga termurah
+  // Menampilkan 3 produk pertama dengan harga termurah
   result.summary.slice(0, 3).forEach((item) => {
     console.log(`- ${item.product}: Termurah di ${item.cheapestStore} (Rp ${item.cheapestPrice.toLocaleString("id-ID")})`);
   });
@@ -143,35 +148,35 @@ main().catch(console.error);
 
 ---
 
-## 🛠️ Dokumentasi API Publik
+## Referensi API
 
-### 1. `compareGame(gameId, options)`
+### compareGame(gameId, options)
 
-Fungsi utama untuk pencarian otomatis kompetitor Google via SerpAPI, scraping paralel, pencocokan denominasi, penghitungan selisih harga pasar, dan pembuatan laporan Excel.
+Fungsi komparasi harga otomatis end-to-end: mengambil kompetitor dari SerpAPI, scraping paralel, normalisasi produk, perhitungan selisih, dan ekspor laporan Excel.
 
 ```javascript
-const result = await compareGame("mobile-legends", options);
+const result = await compareGame(gameId, options);
 ```
 
 #### Parameter:
-- `gameId` *(string, Wajib)*: `"mobile-legends"` | `"free-fire"` | `"roblox"`
-- `options` *(object, Opsional)*:
+- `gameId` (*string*, Wajib): Pilihan game yang didukung (`"mobile-legends"`, `"free-fire"`, atau `"roblox"`).
+- `options` (*object*, Opsional):
   | Opsi | Tipe | Default | Keterangan |
   | :--- | :---: | :---: | :--- |
-  | `apiKey` | `string` | `process.env.SERPAPI_KEY` | SerpAPI Key jika tidak diset di `.env`. |
-  | `limit` | `number` | `10` | Jumlah kompetitor Google yang discrape (1–10). |
-  | `concurrency` | `number` | `3` | Jumlah browser tab paralel (1–4). |
-  | `maxAttempts` | `number` | `3` | Batas percobaan ulang per toko jika gagal/timeout (1–5). |
-  | `headed` | `boolean` | `false` | `true` untuk menampilkan visual jendela browser. |
-  | `exportXlsxDirectory` | `string` | `null` | Path folder tujuan ekspor file Excel (`.xlsx`). |
-  | `calculateTax` | `object` | `null` | Dictionary aturan PPN / biaya per domain toko. |
-  | `proxy` | `string` / `object` | `null` | URL proxy per-request (`host:port:user:pass` atau format URL). |
+  | `apiKey` | `string` | `process.env.SERPAPI_KEY` | Kunci SerpAPI alternatif jika tidak didefinisikan pada `.env`. |
+  | `limit` | `number` | `10` | Jumlah maksimal toko kompetitor Google yang diproses (1–10). |
+  | `concurrency` | `number` | `3` | Jumlah browser tab yang berjalan secara paralel (1–4). |
+  | `maxAttempts` | `number` | `3` | Batas perulangan jika terjadi gangguan jaringan sementara (1–5). |
+  | `headed` | `boolean` | `false` | Menampilkan antarmuka visual browser jika diset `true`. |
+  | `exportXlsxDirectory` | `string` | `null` | Direktori tujuan penyimpanan file laporan Excel (.xlsx). |
+  | `calculateTax` | `object` | `null` | Aturan persentase pajak atau biaya transaksi per domain toko. |
+  | `proxy` | `string` / `object` | `null` | URL proxy spesifik untuk request ini. |
 
 ---
 
-### 2. `compareUrls(mainUrl, competitorUrl, options)`
+### compareUrls(mainUrl, competitorUrl, options)
 
-Membandingkan harga secara *head-to-head* langsung antara dua URL toko tanpa menggunakan kuota SerpAPI Google.
+Membandingkan harga secara langsung antara dua alamat URL toko tanpa menggunakan kuota SerpAPI Google.
 
 ```javascript
 const { compareUrls } = require("@makarimalahmad/price-scraper-sdk");
@@ -181,34 +186,31 @@ const result = await compareUrls(
   "https://itemku.com/id/g/mobile-legends/top-up",
   {
     game: "mobile-legends",
-    exportCsvPath: "./mlbb-comparison.csv", // Opsional: ekspor CSV
+    exportCsvPath: "./mlbb-comparison.csv",
   }
 );
-
-console.log(`Matched Rows: ${result.comparisonRows.length}`);
-console.log(result.comparisonRows[0]);
 ```
 
 #### Parameter:
-- `mainUrl` *(string, Wajib)*: URL toko patokan utama.
-- `competitorUrl` *(string, Wajib)*: URL toko kompetitor.
-- `options` *(object, Opsional)*:
-  - `game` *(string)*: ID game (default: `"mobile-legends"`).
-  - `exportCsvPath` *(string)*: Path file tujuan ekspor CSV.
-  - `calculateTax` *(object)*: Aturan pajak/fee.
+- `mainUrl` (*string*, Wajib): URL toko patokan utama.
+- `competitorUrl` (*string*, Wajib): URL toko kompetitor.
+- `options` (*object*, Opsional):
+  - `game` (*string*): ID game (default: `"mobile-legends"`).
+  - `exportCsvPath` (*string*): Lokasi penyimpanan file CSV hasil komparasi.
+  - `calculateTax` (*object*): Aturan kalkulasi biaya transaksi.
 
 ---
 
-### 3. `scrapeUrl(url, options)`
+### scrapeUrl(url, options)
 
-Melakukan scraping produk dan harga dari satu alamat URL web toko tunggal.
+Melakukan scraping daftar produk dan harga dari satu URL toko.
 
 ```javascript
 const { scrapeUrl } = require("@makarimalahmad/price-scraper-sdk");
 
 const result = await scrapeUrl("https://upoint.id/top-up/roblox", {
   headed: false,
-  exportCsvPath: "./upoint-roblox.csv", // Opsional: ekspor CSV
+  exportCsvPath: "./upoint-roblox.csv",
 });
 
 if (result.success) {
@@ -221,40 +223,21 @@ if (result.success) {
 }
 ```
 
-#### Return Object `scrapeUrl`:
-```javascript
-{
-  success: true,
-  url: "https://upoint.id/top-up/roblox",
-  products: [
-    { name: "100 Robux", price: "Rp 22.000", rawPrice: 22000 },
-    // ...
-  ],
-  count: 14,
-  confidence: 0.95,
-  status: "SUCCESS",
-  usedAiFallback: false,
-  extractionMethod: "standard", // "standard" | "ai_fallback" | "failed"
-  reasons: [],
-  csvPath: "./upoint-roblox.csv"
-}
-```
-
 ---
 
-### 4. `applyTaxCalculation(taxRules, payload)`
+### applyTaxCalculation(taxRules, payload)
 
-Fungsi utilitas murni untuk menghitung harga setelah disesuaikan dengan persentase pajak atau biaya transaksi platform:
+Fungsi utilitas murni untuk menghitung harga setelah disesuaikan dengan aturan pajak atau biaya transaksi:
 
 ```javascript
 const { applyTaxCalculation } = require("@makarimalahmad/price-scraper-sdk");
 
 const taxRules = {
   "unipin.com": 11,          // PPN 11%
-  "itemku.com": 0.7,         // QRIS 0.7%
+  "itemku.com": "0.7%",      // Biaya QRIS 0.7%
   "codashop.com": {
-    "mobile-legends": 12.11, // PPN 11% + QRIS 1%
-    "roblox": 0,
+    "mobile-legends": 12.11, // PPN 11% + QRIS 1.11%
+    "roblox": 0,             // Tanpa penyesuaian biaya
   },
 };
 
@@ -264,24 +247,24 @@ const finalPrice = applyTaxCalculation(taxRules, {
   game: "free-fire",
 });
 
-console.log(finalPrice); // 111000
+console.log(finalPrice); // Output: 111000
 ```
 
 ---
 
-## 📊 Struktur Return Object `compareGame`
+## Struktur Data Return
 
-Objek lengkap yang dikembalikan saat memanggil `await compareGame(...)`:
+Format data yang dikembalikan oleh fungsi `compareGame`:
 
 ```javascript
 {
   game: "Free Fire",
   gameId: "free-fire",
-  generatedAt: "2026-09-15T07:00:00.000Z",
+  generatedAt: "2026-09-17T08:00:00.000Z",
   storeCount: 12,
   successfulStoreCount: 12,
 
-  // Detail status seluruh toko (patokan utama & kompetitor)
+  // Metadata dan status scraping masing-masing toko
   stores: [
     {
       name: "UPoint",
@@ -291,6 +274,7 @@ Objek lengkap yang dikembalikan saat memanggil `await compareGame(...)`:
       url: "https://upoint.id/top-up/free_fire",
       productCount: 18,
       status: "SUCCESS",
+      usedProxy: false,
       reason: null,
       confidence: 0.95
     },
@@ -302,19 +286,19 @@ Objek lengkap yang dikembalikan saat memanggil `await compareGame(...)`:
       url: "https://itemku.com/id/g/garena-free-fire/top-up",
       productCount: 15,
       status: "SUCCESS",
+      usedProxy: false,
       reason: null,
       confidence: 0.90
     }
   ],
 
-  // Tabel matriks komparasi lengkap (denominasi vs semua toko & benchmark)
+  // Matriks komparasi produk terhadap patokan dan pasar
   comparisonTable: [
     {
       Produk: "5 Diamonds",
       UPoint: 1000,
       DuniaGames: 960,
       "itemku.com": 796,
-      "kiosgamer.co.id": 1000,
       "codashop.com": 901,
       "Harga Terendah | UPoint": 1000,
       "Harga Terendah | UPoint Selisih": 204,
@@ -325,7 +309,7 @@ Objek lengkap yang dikembalikan saat memanggil `await compareGame(...)`:
     }
   ],
 
-  // Ringkasan toko termurah per item produk
+  // Ringkasan toko termurah per denominasi produk
   summary: [
     {
       product: "5 Diamonds",
@@ -334,52 +318,52 @@ Objek lengkap yang dikembalikan saat memanggil `await compareGame(...)`:
     }
   ],
 
-  // Path file Excel yang berhasil digenerate
-  xlsxFilePath: "C:/.../output/2026-09-15/comparison/free-fire/scrape-free-fire.xlsx"
+  // Path file Excel yang dihasilkan
+  xlsxFilePath: "./output/2026-09-17/comparison/free-fire/scrape-free-fire.xlsx"
 }
 ```
 
 ---
 
-## ⚙️ Kustomisasi Pajak & Biaya Toko (`calculateTax`)
+## Penyesuaian Pajak dan Biaya Toko
 
-Secara default, scraper mengambil harga asli mentah (*raw price*) yang tertera di website toko. Jika ingin menghitung estimasi harga bayar final (setelah PPN atau biaya transaksi QRIS), teruskan opsi `calculateTax`:
+Secara default, scraper mengambil harga asli mentah (*raw price*) yang tertera di website toko. Parameter `calculateTax` digunakan jika diperlukan perhitungan estimasi harga final:
 
 ```javascript
 const result = await compareGame("mobile-legends", {
   calculateTax: {
-    // 1. Tarif seragam per domain:
-    "unipin.com": 11,           // PPN 11% (angka murni)
-    "itemku.com": "0.7%",       // Biaya QRIS (string persen)
+    // 1. Tarif seragam per domain toko:
+    "unipin.com": 11,           // PPN 11% (format angka)
+    "itemku.com": "0.7%",       // Biaya QRIS (format string persentase)
     "ditusi.co.id": 12.11,      // PPN 11% + QRIS 1%
 
-    // 2. Tarif berbeda per game:
+    // 2. Tarif berbeda per game dalam satu domain:
     "codashop.com": {
-      "mobile-legends": 12.11,  // MLBB 12.11%
-      "free-fire": 11,          // FF 11%
-      "roblox": 0,              // Roblox 0% (harga normal)
+      "mobile-legends": 12.11,
+      "free-fire": 11,
+      "roblox": 0,
     },
   },
 });
 ```
 
-> [!TIP]
-> - Domain otomatis dinormalisasi oleh SDK (tanpa `www.` dan huruf kecil).
-> - Toko patokan utama (**UPoint** & **DuniaGames**) atau toko yang tidak didefinisikan dalam dictionary akan otomatis menggunakan harga aslinya (0% penyesuaian).
+Aturan Perhitungan:
+- Domain dinormalisasi secara otomatis (huruf kecil dan tanpa awalan `www.`).
+- Toko patokan utama (UPoint dan DuniaGames) atau domain yang tidak didefinisikan dalam aturan tidak akan dikenakan penyesuaian biaya (menggunakan harga asli).
 
 ---
 
-## 🌐 Dukungan Proxy
+## Konfigurasi Proxy
 
-Untuk mencegah pemblokiran IP saat scraping toko dengan proteksi ketat, gunakan opsi `proxy`:
+Untuk toko dengan proteksi jaringan ketat atau pemblokiran IP datacenter, konfigurasi proxy dapat diteruskan melalui opsi `proxy`:
 
 ```javascript
-// 1. Format URL standar
+// Format URL standar
 const result = await compareGame("roblox", {
   proxy: "http://username:password@isp-proxy.net:10001",
 });
 
-// 2. Format penyedia proxy IP:Port:User:Pass
+// Format host:port:user:pass
 const result = await compareGame("roblox", {
   proxy: "isp-proxy.net:10001:username:password",
 });
@@ -387,25 +371,25 @@ const result = await compareGame("roblox", {
 
 ---
 
-## 🚦 Status Ekstraksi Toko
+## Status Hasil Ekstraksi
 
-Setiap toko pada `result.stores` memiliki label `status` untuk mempermudah monitoring kualitas data:
+Field `status` pada tiap toko di dalam `result.stores` merepresentasikan hasil ekstraksi:
 
-| Status | Penjelasan |
+| Status | Deskripsi |
 | :--- | :--- |
-| **`SUCCESS`** | Berhasil diekstrak sempurna via parser DOM HTML standar toko (`reason: null`). |
-| **`SUCCESS_FALLBACK`** | Berhasil dipulihkan secara otomatis oleh AI LLM Fallback saat DOM toko tidak lengkap. |
-| **`FAILED_FALLBACK`** | Gagal mengekstrak setelah dicoba melalui DOM dan AI LLM Fallback. |
-| **`FAILED`** | Gagal teknis sebelum ekstraksi (timeout koneksi, Cloudflare challenge berlanjut, atau error navigasi). |
+| `SUCCESS` | Data berhasil diekstrak melalui parser DOM HTML standar toko. |
+| `SUCCESS_FALLBACK` | Data berhasil dipulihkan melalui AI LLM Fallback saat DOM HTML tidak standar atau berubah. |
+| `FAILED_FALLBACK` | Gagal mengekstrak data setelah melalui parser DOM dan AI LLM Fallback. |
+| `FAILED` | Gagal pada tahap koneksi browser (timeout jaringan, blokir HTTP 403, error proxy, atau proteksi Cloudflare). |
 
 ---
 
-## 💻 Penggunaan via CLI / Terminal
+## Penggunaan Melalui CLI
 
-SDK menyediakan file runner CLI jika Anda ingin menjalankan komparasi langsung dari terminal, git clone, atau cron job server:
+SDK menyediakan script CLI untuk eksekusi manual atau integrasi cron job:
 
 ```bash
-# Komparasi game tertentu
+# Komparasi game tunggal
 node compare-game.js --game mobile-legends
 node compare-game.js --game free-fire
 node compare-game.js --game roblox
@@ -413,21 +397,21 @@ node compare-game.js --game roblox
 # Komparasi seluruh game secara berurutan
 node compare-game.js --game all
 
-# Runner harian otomatis cron VPS (dengan rotasi folder output)
+# Script otomasi harian VPS
 ./scrape-daily.sh
 ```
 
 ---
 
-## 🧪 Pengujian & Verifikasi
+## Pengujian
 
-Untuk menjalankan seluruh rangkaian pemeriksaan sintaks dan unit test internal:
+Menjalankan seluruh rangkaian validasi sintaks dan unit test:
 
 ```bash
 npm test
 ```
 
-Uji kalkulasi pajak & normalisasi domain saja:
+Menjalankan pengujian logika kalkulasi pajak dan normalisasi toko saja:
 
 ```bash
 npm run test:tax
@@ -435,6 +419,6 @@ npm run test:tax
 
 ---
 
-## 📄 Lisensi
+## Lisensi
 
-Proyek ini dilisensikan di bawah [ISC License](LICENSE).
+ISC License.
