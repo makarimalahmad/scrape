@@ -409,9 +409,3 @@ Menjalankan seluruh rangkaian validasi sintaks dan unit test:
 ```bash
 npm test
 ```
-
-Menjalankan pengujian logika kalkulasi pajak dan normalisasi toko saja:
-
-```bash
-npm run test:tax
-```
