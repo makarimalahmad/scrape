@@ -1,7 +1,6 @@
 const { chromium } = require("./lib/browser/playwright");
 const readline = require("readline/promises");
 const { validateScrapeResults } = require("./lib/validation/validate-results");
-const { extractWithAi } = require("./lib/extractors/ai-extractor");
 
 // Modular internal libraries
 const { parseProxy, getProxyForUrl } = require("./lib/proxy/proxy-manager");
@@ -387,64 +386,17 @@ async function scrape(url, selector, headed, options = {}) {
 
     let rows = specialRows ?? genericRows ?? [];
 
-    // 5. AI Fallback jika data belum memadai
-    let usedAiFallback = false;
-    const detectedGame =
-      options.game ||
-      (/roblox/i.test(url.pathname)
-        ? "roblox"
-        : /free-fire/i.test(url.pathname)
-          ? "free-fire"
-          : /mobile-legends/i.test(url.pathname)
-            ? "mobile-legends"
-            : "");
-    const tempValidation = validateScrapeResults(url, rows, detectedGame);
-    let triedAiFallback = false;
-    let aiFallbackError = null;
-    const hasAiConfigured = Boolean(
-      process.env.AI_API_KEY && process.env.AI_BASE_URL && process.env.AI_MODEL,
-    );
-    if ((!rows.length || !tempValidation.valid || rows.length < 4) && hasAiConfigured) {
-      triedAiFallback = true;
-      try {
-        console.log("Ekstraksi standar belum lengkap, mencoba AI fallback...");
-        const pageText = await page.evaluate(() => document.body?.innerText || "");
-        const aiRows = await extractWithAi(pageText, detectedGame || options.game || "");
-        if (aiRows && aiRows.length >= (rows.length || 1)) {
-          console.log(`[AI Fallback] Berhasil mengekstrak ${aiRows.length} produk!`);
-          rows = aiRows;
-          usedAiFallback = true;
-        }
-      } catch (err) {
-        aiFallbackError = err.message;
-        console.log("[AI Fallback] Fallback dilewati:", err.message);
-      }
-    }
-
     if (!rows.length) {
-      const err = new Error(
-        triedAiFallback && !aiFallbackError
-          ? "Ekstraksi standar dan AI Fallback keduanya tidak menemukan data harga pada halaman ini."
-          : "Data harga tidak ditemukan pada halaman ini.",
-      );
-      err.triedAiFallback = triedAiFallback;
-      err.aiFallbackError = aiFallbackError;
-      throw err;
+      throw new Error("Data harga tidak ditemukan pada halaman ini.");
     }
 
     const finalRows = rows.map((row, index) => {
       const cleanRow = { ...row };
-      delete cleanRow._usedAiFallback;
       return {
         No: index + 1,
         ...cleanRow,
         Sumber: url.href,
       };
-    });
-    Object.defineProperty(finalRows, "_usedAiFallback", {
-      value: usedAiFallback,
-      enumerable: false,
-      writable: true,
     });
     Object.defineProperty(finalRows, "_usedProxy", {
       value: usedProxy,

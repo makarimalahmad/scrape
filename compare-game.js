@@ -527,10 +527,8 @@ async function processGame(apiKey, gameConfig, options) {
       position: null,
       url: store.url,
       productCount: store.products.size,
-      status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
-      reason: store.usedAiFallback
-        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
-        : null,
+      status: "SUCCESS",
+      reason: null,
       usedProxy: Boolean(store.usedProxy),
     })),
     ...competitors.map((store) => ({
@@ -540,10 +538,8 @@ async function processGame(apiKey, gameConfig, options) {
       organicPosition: store.organicPosition ?? null,
       url: store.url,
       productCount: store.products.size,
-      status: store.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS",
-      reason: store.usedAiFallback
-        ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
-        : null,
+      status: "SUCCESS",
+      reason: null,
       usedProxy: Boolean(store.usedProxy),
     })),
     ...failedMainStores.map((store) => ({
@@ -552,7 +548,7 @@ async function processGame(apiKey, gameConfig, options) {
       position: null,
       url: store.url,
       productCount: 0,
-      status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
+      status: "FAILED",
       reason: cleanErrorMessage(store.error) || "Gagal melakukan ekstraksi data",
       usedProxy: Boolean(store.usedProxy),
     })),
@@ -563,7 +559,7 @@ async function processGame(apiKey, gameConfig, options) {
       organicPosition: store.organicPosition ?? null,
       url: store.url,
       productCount: 0,
-      status: String(store.error || "").toLowerCase().includes("fallback") ? "FAILED_FALLBACK" : "FAILED",
+      status: "FAILED",
       reason: cleanErrorMessage(store.error) || "Gagal melakukan ekstraksi data",
       usedProxy: Boolean(store.usedProxy),
     })),

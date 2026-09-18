@@ -99,11 +99,6 @@ Definisikan variabel lingkungan pada file `.env` di root direktori aplikasi:
 # Kredensial SerpAPI (Wajib untuk fungsi compareGame)
 SERPAPI_KEY=kunci_serpapi_anda
 
-# Konfigurasi LLM AI Fallback (Opsional: pemulihan otomatis jika DOM toko berubah)
-AI_API_KEY=kunci_api_llm_anda
-AI_BASE_URL=https://api.openai.com/v1/chat/completions
-AI_MODEL=gpt-4o-mini
-
 # Konfigurasi Proxy (Opsional: digunakan untuk toko yang memblokir IP datacenter)
 PROXY_URL=http://username:password@proxy-host:port
 PROXY_DOMAINS=bangjeff.com,tokogame.com
@@ -376,10 +371,8 @@ Field `status` pada tiap toko di dalam `result.stores` merepresentasikan hasil e
 
 | Status | Deskripsi |
 | :--- | :--- |
-| `SUCCESS` | Data berhasil diekstrak melalui parser DOM HTML standar toko. |
-| `SUCCESS_FALLBACK` | Data berhasil dipulihkan melalui AI LLM Fallback saat DOM HTML tidak standar atau berubah. |
-| `FAILED_FALLBACK` | Gagal mengekstrak data setelah melalui parser DOM dan AI LLM Fallback. |
-| `FAILED` | Gagal pada tahap koneksi browser (timeout jaringan, blokir HTTP 403, error proxy, atau proteksi Cloudflare). |
+| `SUCCESS` | Data berhasil diekstrak melalui parser DOM / API toko. |
+| `FAILED` | Gagal pada tahap koneksi atau ekstraksi data (timeout jaringan, blokir HTTP 403, error proxy, atau proteksi Cloudflare). |
 
 ---
 

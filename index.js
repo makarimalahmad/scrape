@@ -33,7 +33,6 @@ const {
   parsePrice,
   selectCheapestProducts,
 } = require("./lib/matcher/product-matcher");
-const { extractWithAi } = require("./lib/extractors/ai-extractor");
 
 /**
  * Scrape price data from a single store URL.
@@ -96,7 +95,6 @@ async function scrapeUrl(url, options = {}) {
       csvPath = exportCsv(rawRows, options.exportCsvPath);
     }
 
-    const usedAiFallback = Boolean(rawRows?._usedAiFallback || rawRows?.some((r) => r._usedAiFallback));
     return {
       success: validation.valid,
       url,
@@ -104,8 +102,6 @@ async function scrapeUrl(url, options = {}) {
       count: products.length,
       confidence: validation.confidence,
       status: validation.status,
-      usedAiFallback,
-      extractionMethod: usedAiFallback ? "ai_fallback" : "standard",
       reasons: validation.reasons,
       csvPath,
     };
@@ -117,8 +113,6 @@ async function scrapeUrl(url, options = {}) {
       count: 0,
       confidence: 0,
       status: "FAILED",
-      usedAiFallback: false,
-      extractionMethod: "failed",
       error: error.message,
     };
   }
@@ -396,13 +390,8 @@ async function compareGame(gameId, options = {}) {
         : null;
       let reason = cleanReason;
       if (success) {
-        status = s.usedAiFallback ? "SUCCESS_FALLBACK" : "SUCCESS";
-        reason = s.usedAiFallback
-          ? "Ekstraksi standar DOM belum lengkap, berhasil dipulihkan oleh AI Fallback"
-          : null;
-      } else if (String(s.error || "").toLowerCase().includes("fallback")) {
-        status = "FAILED_FALLBACK";
-        reason = cleanReason;
+        status = "SUCCESS";
+        reason = null;
       }
       return {
         name: s.name,
@@ -448,9 +437,8 @@ module.exports = {
   calculateComparison,
   selectBenchmark,
 
-  // Validation & AI Engines
+  // Validation Engines
   validateScrapeResults,
-  extractWithAi,
 
   // SerpAPI & Google Ranking
   searchGoogle,
