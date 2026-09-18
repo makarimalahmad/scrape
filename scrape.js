@@ -404,6 +404,7 @@ async function scrape(url, selector, headed, options = {}) {
       }
 
       const challenge = await solveCloudflareChallenge(page, {
+        domain,
         timeout: options.cloudflareTimeout ?? 60_000,
         maxClicks: options.maxCloudflareClicks ?? 4,
       });
@@ -422,15 +423,15 @@ async function scrape(url, selector, headed, options = {}) {
         }
 
         const message = challenge.clickLimitReached
-          ? `Cloudflare terus mengulang challenge setelah ${challenge.clickCount} klik otomatis. Situs dilewati tanpa retry langsung.`
-          : `Verifikasi Cloudflare tidak selesai dalam batas waktu setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
+          ? `[Cloudflare] ${domain} terus mengulang challenge setelah ${challenge.clickCount} klik otomatis. Situs dilewati tanpa retry langsung.`
+          : `[Cloudflare] ${domain} verifikasi tidak selesai dalam batas waktu setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
         const error = new Error(message);
         error.retryable = false;
         throw error;
       }
 
       console.log(
-        `Cloudflare lolos setelah ${challenge.clickCount} klik. Menunggu produk dimuat...`,
+        `[Cloudflare] ${domain} lolos setelah ${challenge.clickCount} klik. Menunggu produk dimuat...`,
       );
     }
 
