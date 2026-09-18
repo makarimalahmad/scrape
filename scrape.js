@@ -189,6 +189,58 @@ async function triggerStoreSpecificInteractions(page, url) {
   await page.waitForTimeout(400);
 }
 
+async function detectStoreMaintenance(page, response) {
+  if (response?.status() === 503) {
+    return "Layanan sedang dalam pemeliharaan (HTTP 503 Service Unavailable)";
+  }
+
+  return await page
+    .evaluate(() => {
+      const maintenancePatterns = [
+        /sedang\s+(dalam\s+)?(pemeliharaan|perbaikan|maintenance)/i,
+        /pemeliharaan\s+sistem/i,
+        /gangguan\s+(sistem|transaksi|layanan)/i,
+        /layanan\s+sedang\s+tidak\s+tersedia/i,
+        /item\s+(sedang\s+)?habis/i,
+        /produk\s+(sedang\s+)?habis/i,
+        /stok\s+(sedang\s+)?(habis|kosong)/i,
+        /out\s+of\s+stock/i,
+        /under\s+maintenance/i,
+        /temporarily\s+unavailable/i,
+        /we('?ll| will)\s+be\s+back\s+soon/i,
+        /toko\s+sedang\s+(tutup|libur)/i,
+      ];
+
+      // 1. Cek popup, modal, alert, dialog khusus
+      const modalElements = Array.from(
+        document.querySelectorAll(
+          "app-popup-error-transaction, [role='dialog'], [role='alert'], .cdk-overlay-pane, [class*='modal'], [class*='popup'], [class*='dialog'], [class*='alert'], [class*='maintenance'], [class*='notice'], [class*='error-payment']",
+        ),
+      );
+
+      for (const el of modalElements) {
+        const text = el.innerText?.trim();
+        if (text && maintenancePatterns.some((pattern) => pattern.test(text))) {
+          return text.replace(/\s+/g, " ").slice(0, 120);
+        }
+      }
+
+      // 2. Cek heading utama / title / notice banner jika halaman kosong dari produk
+      const headers = Array.from(
+        document.querySelectorAll("h1, h2, title, .maintenance-message, .error-message"),
+      );
+      for (const el of headers) {
+        const text = (el.innerText || el.textContent || "").trim();
+        if (text && maintenancePatterns.some((pattern) => pattern.test(text))) {
+          return text.replace(/\s+/g, " ").slice(0, 120);
+        }
+      }
+
+      return null;
+    })
+    .catch(() => null);
+}
+
 async function scrape(url, selector, headed, options = {}) {
   url = url instanceof URL ? url : new URL(url);
   if (
@@ -299,6 +351,15 @@ async function scrape(url, selector, headed, options = {}) {
     }
     await page.locator("body").waitFor({ state: "attached", timeout: 15_000 }).catch(() => {});
 
+    if (response?.status() === 503) {
+      const error = new Error(
+        `[Maintenance] Akses ke ${domain} dilewati: Layanan sedang dalam pemeliharaan (HTTP 503 Service Unavailable).`,
+      );
+      error.retryable = false;
+      error.isMaintenance = true;
+      throw error;
+    }
+
     // 3. Deteksi dan Penanganan Cloudflare
     let hasCloudflare =
       response?.status() === 403 || (await pageShowsCloudflareChallenge(page));
@@ -387,6 +448,13 @@ async function scrape(url, selector, headed, options = {}) {
     let rows = specialRows ?? genericRows ?? [];
 
     if (!rows.length) {
+      const maintenance = await detectStoreMaintenance(page, response);
+      if (maintenance) {
+        const error = new Error(`[Maintenance] Akses ke ${domain} dilewati: ${maintenance}`);
+        error.retryable = false;
+        error.isMaintenance = true;
+        throw error;
+      }
       throw new Error("Data harga tidak ditemukan pada halaman ini.");
     }
 
@@ -470,6 +538,7 @@ if (require.main === module) {
 // 100% Backward-Compatible Exports
 module.exports = {
   DEFAULT_SELECTOR,
+  detectStoreMaintenance,
   exportCsv,
   extractProductPairsFromJson,
   getProxyForUrl,

@@ -214,6 +214,41 @@ test("Matcher: 1000 Diamonds biasa tetap tanpa label", () => {
   assert.strictEqual(product.quantity, 1000);
 });
 
+// -------------------------------------------------------------
+// 6. Uji Deteksi Error Non-Retryable (Maintenance, Proxy, Blokir)
+// -------------------------------------------------------------
+const { isTemporaryScrapeError } = require("../lib/google/google-search");
+
+test("isTemporaryScrapeError: Error [Maintenance] ditandai non-retryable (fail-fast)", () => {
+  const err = new Error("[Maintenance] Akses ke duniagames.co.id dilewati: Maaf.. item habis");
+  err.retryable = false;
+  err.isMaintenance = true;
+  assert.strictEqual(isTemporaryScrapeError(err), false);
+});
+
+test("isTemporaryScrapeError: Error dengan flag isMaintenance ditandai non-retryable", () => {
+  const err = new Error("Toko sedang maintenance");
+  err.isMaintenance = true;
+  assert.strictEqual(isTemporaryScrapeError(err), false);
+});
+
+test("isTemporaryScrapeError: Error [Blokir] HTTP 403 ditandai non-retryable", () => {
+  const err = new Error("[Blokir] Akses ke lapakgaming.com terblokir (HTTP 403)");
+  err.retryable = false;
+  assert.strictEqual(isTemporaryScrapeError(err), false);
+});
+
+test("isTemporaryScrapeError: Error [Proxy Error] ditandai non-retryable", () => {
+  const err = new Error("[Proxy Error] Proxy ditolak atau kuota habis");
+  err.proxyFailed = true;
+  assert.strictEqual(isTemporaryScrapeError(err), false);
+});
+
+test("isTemporaryScrapeError: Network timeout biasa tetap di-retry", () => {
+  const err = new Error("Koneksi ke situs timeout (ERR_TIMED_OUT)");
+  assert.strictEqual(isTemporaryScrapeError(err), true);
+});
+
 console.log("==================================================");
 console.log(`HASIL: ${testsPassed} Berhasil, ${testsFailed} Gagal`);
 console.log("==================================================");
