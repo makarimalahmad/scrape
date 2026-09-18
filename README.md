@@ -6,29 +6,29 @@ SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan R
 
 ## Daftar Isi
 
-- [Fitur](#fitur)
-- [Game yang Didukung](#game-yang-didukung)
-- [Instalasi](#instalasi)
-  - [Autentikasi GitHub Packages (.npmrc)](#autentikasi-github-packages-npmrc)
-  - [Instalasi Paket](#instalasi-paket)
-  - [Instalasi Dependensi Browser](#instalasi-dependensi-browser)
-- [Konfigurasi Lingkungan (.env)](#konfigurasi-lingkungan-env)
-- [Panduan Penggunaan](#panduan-penggunaan)
-- [Referensi API](#referensi-api)
-  - [compareGame(gameId, options)](#comparegamegameid-options)
-  - [compareUrls(mainUrl, competitorUrl, options)](#compareurlsmainurl-competitorurl-options)
-  - [scrapeUrl(url, options)](#scrapeurlurl-options)
-  - [applyTaxCalculation(taxRules, payload)](#applytaxcalculationtaxrules-payload)
-- [Struktur Data Return](#struktur-data-return)
-- [Penyesuaian Pajak dan Biaya Toko](#penyesuaian-pajak-dan-biaya-toko)
-- [Konfigurasi Proxy](#konfigurasi-proxy)
-- [Status Hasil Ekstraksi](#status-hasil-ekstraksi)
-- [Penggunaan Melalui CLI](#penggunaan-melalui-cli)
-- [Pengujian](#pengujian)
+1. [Fitur](#1-fitur)
+2. [Game yang Didukung](#2-game-yang-didukung)
+3. [Instalasi](#3-instalasi)
+   - 3.1. [Autentikasi GitHub Packages (.npmrc)](#31-autentikasi-github-packages-npmrc)
+   - 3.2. [Instalasi Paket](#32-instalasi-paket)
+   - 3.3. [Instalasi Dependensi Browser](#33-instalasi-dependensi-browser)
+4. [Konfigurasi Lingkungan (.env)](#4-konfigurasi-lingkungan-env)
+5. [Panduan Penggunaan](#5-panduan-penggunaan)
+6. [Referensi API](#6-referensi-api)
+   - 6.1. [compareGame(gameId, options)](#61-comparegamegameid-options)
+   - 6.2. [compareUrls(mainUrl, competitorUrl, options)](#62-compareurlsmainurl-competitorurl-options)
+   - 6.3. [scrapeUrl(url, options)](#63-scrapeurlurl-options)
+   - 6.4. [applyTaxCalculation(taxRules, payload)](#64-applytaxcalculationtaxrules-payload)
+7. [Struktur Data Return](#7-struktur-data-return)
+8. [Penyesuaian Pajak dan Biaya Toko](#8-penyesuaian-pajak-dan-biaya-toko)
+9. [Konfigurasi Proxy](#9-konfigurasi-proxy)
+10. [Status Hasil Ekstraksi](#10-status-hasil-ekstraksi)
+11. [Penggunaan Melalui CLI](#11-penggunaan-melalui-cli)
+12. [Pengujian](#12-pengujian)
 
 ---
 
-## Fitur
+## 1. Fitur
 
 - **Peringkat Google Organik**: Mengambil peringkat toko kompetitor langsung dari hasil pencarian Google Indonesia melalui SerpAPI.
 - **Normalisasi Denominasi**: Memetakan varian nama produk (misal: "Weekly Diamond Pass", "86 Diamonds", "Robux Game Card") ke format standar agar dapat dibandingkan secara akurat.
@@ -40,7 +40,7 @@ SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan R
 
 ---
 
-## Game yang Didukung
+## 2. Game yang Didukung
 
 | Game | ID Game (`gameId`) | Toko Patokan Utama | Denominasi yang Dinormalisasi |
 | :--- | :--- | :--- | :--- |
@@ -50,9 +50,9 @@ SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan R
 
 ---
 
-## Instalasi
+## 3. Instalasi
 
-### Autentikasi GitHub Packages (.npmrc)
+### 3.1. Autentikasi GitHub Packages (.npmrc)
 
 Paket ini di-hosting pada **GitHub Packages** (`npm.pkg.github.com`). 
 
@@ -67,7 +67,7 @@ Buat atau tambahkan konfigurasi berikut pada file `.npmrc` di root project Anda 
 
 > **Catatan Token:** Ganti `GITHUB_PERSONAL_ACCESS_TOKEN` dengan token akun GitHub Anda yang memiliki hak akses (*permission scope*) **`read:packages`**.
 
-### Instalasi Paket
+### 3.2. Instalasi Paket
 
 Jalankan perintah berikut pada terminal proyek:
 
@@ -75,7 +75,7 @@ Jalankan perintah berikut pada terminal proyek:
 npm install @makarimalahmad/price-scraper-sdk
 ```
 
-### Instalasi Dependensi Browser
+### 3.3. Instalasi Dependensi Browser
 
 SDK ini memerlukan Chromium yang dikelola oleh Playwright. Jalankan instalasi biner browser setelah paket terpasang:
 
@@ -91,7 +91,7 @@ npx playwright install-deps chromium
 
 ---
 
-## Konfigurasi Lingkungan (.env)
+## 4. Konfigurasi Lingkungan (.env)
 
 Definisikan variabel lingkungan pada file `.env` di root direktori aplikasi:
 
@@ -113,7 +113,7 @@ ADDITIONAL_BLACKLIST_DOMAINS=domainiklan.com,blogpribadi.id
 
 ---
 
-## Panduan Penggunaan
+## 5. Panduan Penggunaan
 
 Contoh eksekusi komparasi harga otomatis untuk game **Free Fire**:
 
@@ -142,9 +142,9 @@ main().catch(console.error);
 
 ---
 
-## Referensi API
+## 6. Referensi API
 
-### compareGame(gameId, options)
+### 6.1. compareGame(gameId, options)
 
 Fungsi komparasi harga otomatis end-to-end: mengambil kompetitor dari SerpAPI, scraping paralel, normalisasi produk, perhitungan selisih, dan ekspor laporan Excel.
 
@@ -168,7 +168,7 @@ const result = await compareGame(gameId, options);
 
 ---
 
-### compareUrls(mainUrl, competitorUrl, options)
+### 6.2. compareUrls(mainUrl, competitorUrl, options)
 
 Membandingkan harga secara langsung antara dua alamat URL toko tanpa menggunakan kuota SerpAPI Google.
 
@@ -195,7 +195,7 @@ const result = await compareUrls(
 
 ---
 
-### scrapeUrl(url, options)
+### 6.3. scrapeUrl(url, options)
 
 Melakukan scraping daftar produk dan harga dari satu URL toko.
 
@@ -219,7 +219,7 @@ if (result.success) {
 
 ---
 
-### applyTaxCalculation(taxRules, payload)
+### 6.4. applyTaxCalculation(taxRules, payload)
 
 Fungsi utilitas murni untuk menghitung harga setelah disesuaikan dengan aturan pajak atau biaya transaksi:
 
@@ -246,7 +246,7 @@ console.log(finalPrice); // Output: 111000
 
 ---
 
-## Struktur Data Return
+## 7. Struktur Data Return
 
 Format data yang dikembalikan oleh fungsi `compareGame`:
 
@@ -319,7 +319,7 @@ Format data yang dikembalikan oleh fungsi `compareGame`:
 
 ---
 
-## Penyesuaian Pajak dan Biaya Toko
+## 8. Penyesuaian Pajak dan Biaya Toko
 
 Secara default, scraper mengambil harga asli mentah (*raw price*) yang tertera di website toko. Parameter `calculateTax` digunakan jika diperlukan perhitungan estimasi harga final:
 
@@ -347,7 +347,7 @@ Aturan Perhitungan:
 
 ---
 
-## Konfigurasi Proxy
+## 9. Konfigurasi Proxy
 
 Untuk toko dengan proteksi jaringan ketat atau pemblokiran IP datacenter, konfigurasi proxy dapat diteruskan melalui opsi `proxy`:
 
@@ -365,7 +365,7 @@ const result = await compareGame("roblox", {
 
 ---
 
-## Status Hasil Ekstraksi
+## 10. Status Hasil Ekstraksi
 
 Field `status` pada tiap toko di dalam `result.stores` merepresentasikan hasil ekstraksi:
 
@@ -376,7 +376,7 @@ Field `status` pada tiap toko di dalam `result.stores` merepresentasikan hasil e
 
 ---
 
-## Penggunaan Melalui CLI
+## 11. Penggunaan Melalui CLI
 
 SDK menyediakan script CLI untuk eksekusi manual atau integrasi cron job:
 
@@ -395,7 +395,7 @@ node compare-game.js --game all
 
 ---
 
-## Pengujian
+## 12. Pengujian
 
 Menjalankan seluruh rangkaian validasi sintaks dan unit test:
 
