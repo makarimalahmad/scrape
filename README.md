@@ -19,7 +19,7 @@ SDK Node.js untuk komparasi harga voucher game (Mobile Legends, Free Fire, dan R
    - 6.2. [compareUrls(mainUrl, competitorUrl, options)](#62-compareurlsmainurl-competitorurl-options)
    - 6.3. [scrapeUrl(url, options)](#63-scrapeurlurl-options)
    - 6.4. [applyTaxCalculation(taxRules, payload)](#64-applytaxcalculationtaxrules-payload)
-7. [Struktur Data Return](#7-struktur-data-return)
+7. [Format Data Hasil Output](#7-format-data-hasil-output)
 8. [Penyesuaian Pajak dan Biaya Toko](#8-penyesuaian-pajak-dan-biaya-toko)
 9. [Konfigurasi Proxy](#9-konfigurasi-proxy)
 10. [Status Hasil Ekstraksi](#10-status-hasil-ekstraksi)
@@ -246,7 +246,7 @@ console.log(finalPrice); // Output: 111000
 
 ---
 
-## 7. Struktur Data Return
+## 7. Format Data Hasil Output
 
 Format data yang dikembalikan oleh fungsi `compareGame`:
 
