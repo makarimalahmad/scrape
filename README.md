@@ -39,16 +39,14 @@ npx playwright install chromium
 Duplikat file `.env.example` menjadi `.env` di folder utama proyek, lalu sesuaikan konfigurasinya:
 
 ```env
-# ==============================================================================
-# PENCARIAN GOOGLE (Pilih: 'brightdata' atau 'serpapi')
-# ==============================================================================
+# Provider pencarian Google ('brightdata' atau 'serpapi')
 SERP_PROVIDER=brightdata
 
-# Konfigurasi Bright Data (Rekomendasi - Lebih hemat & stabil)
+# Bright Data SERP API
 BRIGHTDATA_API_KEY=token_brightdata_anda
 BRIGHTDATA_ZONE=serp_api
 
-# Konfigurasi SerpApi (Opsional: Digunakan otomatis jika Bright Data tidak diatur)
+# SerpApi (Opsional: Digunakan otomatis jika Bright Data tidak diatur)
 # SERPAPI_KEY=key_serpapi_anda
 
 # ==============================================================================
@@ -120,6 +118,37 @@ output/YYYY-MM-DD/
   * 🟩 **Hijau**: Harga termurah di pasar untuk produk tersebut.
   * 🟥 **Merah**: Harga tertinggi di pasar untuk produk tersebut.
 * **Analisis Selisih Harga**: Menghitung secara otomatis selisih nominal (Rp) dan selisih persentase (%) terhadap harga toko utama.
+
+---
+
+## Penyesuaian Pajak & Biaya Toko (Dictionary PPN)
+
+Secara default, scraper mengambil harga asli yang tertera pada situs masing-masing toko. Jika Anda ingin harga kompetitor disesuaikan dengan estimasi PPN (misal 11%) atau biaya transaksi (seperti QRIS 0.7%), SDK menyediakan opsi `calculateTax`:
+
+```javascript
+const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
+
+const result = await compareGame("mobile-legends", {
+  calculateTax: {
+    // 1. Penyesuaian persentase per domain toko:
+    "unipin.com": 11,           // Menambahkan PPN 11% (format angka)
+    "itemku.com": "0.7%",       // Menambahkan biaya QRIS 0.7% (format string %)
+    "ditusi.co.id": 12.11,      // PPN 11% + QRIS 1.11%
+
+    // 2. Penyesuaian khusus per game dalam satu domain:
+    "codashop.com": {
+      "mobile-legends": 11,     // PPN 11% khusus MLBB
+      "free-fire": 11,          // PPN 11% khusus Free Fire
+      "roblox": 0,              // Tanpa penyesuaian untuk Roblox
+    },
+  },
+});
+```
+
+**Ketentuan Penyesuaian:**
+* Toko Utama (**UPoint** dan **DuniaGames**) tidak pernah dikenakan penyesuaian biaya (selalu menggunakan harga asli).
+* Domain toko yang tidak didaftarkan pada dictionary akan tetap menggunakan harga asli tanpa perubahan.
+* Nama domain dicocokkan secara otomatis (tidak terpengaruh awalan `www.` atau huruf besar/kecil).
 
 ---
 
