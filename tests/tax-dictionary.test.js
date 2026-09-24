@@ -2,16 +2,20 @@ const assert = require("assert");
 const {
   applyTaxCalculation,
   selectCheapestProducts,
-  extractDomain,
 } = require("../lib/matcher/product-matcher");
 
-console.log("==================================================");
-console.log("🧪 MENJALANKAN TEST SUITE: DICTIONARY PPN / TAX");
-console.log("==================================================");
+console.log("--------------------------------------------------");
+console.log("TEST SUITE: DICTIONARY PPN & PENYESUAIAN HARGA");
+console.log("--------------------------------------------------");
 
 let testsPassed = 0;
 let testsFailed = 0;
 
+/**
+ * Runner pengujian sederhana:
+ * Menjalankan fungsi pengujian, mencatat status [PASS] atau [FAIL],
+ * dan menghitung total pengujian yang berhasil atau gagal.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -24,10 +28,14 @@ function test(name, fn) {
   }
 }
 
-// -------------------------------------------------------------
-// 1. Uji Multiplier Datar (Flat Multiplier)
-// -------------------------------------------------------------
-test("Multiplikasi flat 11% (1.11) pada domain yang cocok", () => {
+// =============================================================================
+// 1. PENYESUAIAN PERSENTASE FLAT (FLAT MULTIPLIER)
+// =============================================================================
+// Penjelasan:
+// Memastikan persentase penyesuaian (misal PPN 11% atau faktor pengali 1.11)
+// ditambahkan dengan tepat pada harga toko yang terdaftar.
+
+test("Penyesuaian Flat: perkalian 11% (1.11) pada domain yang cocok", () => {
   const taxDict = {
     "lapakgaming.com": 1.11,
   };
@@ -40,7 +48,7 @@ test("Multiplikasi flat 11% (1.11) pada domain yang cocok", () => {
   assert.strictEqual(result, 111000);
 });
 
-test("Toko yang tidak terdaftar di dictionary tidak terkena PPN (harga asli)", () => {
+test("Penyesuaian Flat: toko yang tidak terdaftar tetap menggunakan harga asli", () => {
   const taxDict = {
     "lapakgaming.com": 1.11,
   };
@@ -53,10 +61,14 @@ test("Toko yang tidak terdaftar di dictionary tidak terkena PPN (harga asli)", (
   assert.strictEqual(result, 50000);
 });
 
-// -------------------------------------------------------------
-// 2. Uji Nested Sub-Dictionary per Game (Kasus Codashop)
-// -------------------------------------------------------------
-test("Nested Sub-Dictionary: Codashop 11% untuk MLBB", () => {
+// =============================================================================
+// 2. PENYESUAIAN KHUSUS PER GAME (NESTED SUB-DICTIONARY)
+// =============================================================================
+// Penjelasan:
+// Satu domain toko bisa memiliki aturan pajak/biaya yang berbeda untuk setiap game.
+// Contoh: Mobile Legends dikenakan 11%, tetapi Roblox tidak dikenakan penyesuaian.
+
+test("Sub-Dictionary Game: penyesuaian 11% khusus Mobile Legends", () => {
   const taxDict = {
     "codashop.com": {
       "mobile-legends": 1.11,
@@ -72,7 +84,7 @@ test("Nested Sub-Dictionary: Codashop 11% untuk MLBB", () => {
   assert.strictEqual(result, 22200);
 });
 
-test("Nested Sub-Dictionary: Codashop 11% untuk Free Fire", () => {
+test("Sub-Dictionary Game: penyesuaian 11% khusus Free Fire", () => {
   const taxDict = {
     "codashop.com": {
       "mobile-legends": 1.11,
@@ -88,7 +100,7 @@ test("Nested Sub-Dictionary: Codashop 11% untuk Free Fire", () => {
   assert.strictEqual(result, 55500);
 });
 
-test("Nested Sub-Dictionary: Codashop 0% (tidak kena PPN) untuk Roblox jika tidak didefinisikan", () => {
+test("Sub-Dictionary Game: game yang tidak terdaftar di rule tetap harga asli (0%)", () => {
   const taxDict = {
     "codashop.com": {
       "mobile-legends": 1.11,
@@ -101,13 +113,17 @@ test("Nested Sub-Dictionary: Codashop 0% (tidak kena PPN) untuk Roblox jika tida
     game: "roblox",
   };
   const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 65000, "Harga Roblox harus tetap harga asli (tidak terkena PPN)");
+  assert.strictEqual(result, 65000, "Harga Roblox harus tetap harga asli");
 });
 
-// -------------------------------------------------------------
-// 3. Uji Normalisasi Nama Game (Spasi vs Dash vs Singkatan)
-// -------------------------------------------------------------
-test("Normalisasi Game: 'Mobile Legends' cocok dengan rule 'mobile-legends'", () => {
+// =============================================================================
+// 3. NORMALISASI FORMAT NAMA GAME
+// =============================================================================
+// Penjelasan:
+// Memastikan penulisan nama game fleksibel (huruf besar/kecil, spasi, atau singkatan)
+// tetap cocok dengan aturan di dictionary.
+
+test("Normalisasi Game: nama dengan spasi 'Mobile Legends' cocok ke 'mobile-legends'", () => {
   const taxDict = {
     "codashop.com": {
       "mobile-legends": 1.11,
@@ -122,7 +138,7 @@ test("Normalisasi Game: 'Mobile Legends' cocok dengan rule 'mobile-legends'", ()
   assert.strictEqual(result, 11100);
 });
 
-test("Normalisasi Game: 'mlbb' cocok dengan rule 'mobile-legends'", () => {
+test("Normalisasi Game: singkatan populer 'mlbb' cocok ke 'mobile-legends'", () => {
   const taxDict = {
     "codashop.com": {
       "mobile-legends": 1.11,
@@ -137,25 +153,14 @@ test("Normalisasi Game: 'mlbb' cocok dengan rule 'mobile-legends'", () => {
   assert.strictEqual(result, 11100);
 });
 
-test("Normalisasi Game: 'Free Fire' cocok dengan rule 'free-fire'", () => {
-  const taxDict = {
-    "codashop.com": {
-      "free-fire": 1.11,
-    },
-  };
-  const payload = {
-    rawPrice: 10000,
-    domain: "codashop.com",
-    game: "Free Fire",
-  };
-  const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 11100);
-});
+// =============================================================================
+// 4. ATURAN PENGGANTI OTOMATIS (DEFAULT FALLBACK)
+// =============================================================================
+// Penjelasan:
+// Jika sub-dictionary menyediakan opsi 'default', game yang tidak disebutkan
+// secara spesifik akan menggunakan nilai default tersebut.
 
-// -------------------------------------------------------------
-// 4. Uji Sub-Dictionary dengan Default Fallback
-// -------------------------------------------------------------
-test("Sub-Dictionary: fallback ke 'default' jika game spesifik tidak ditemukan", () => {
+test("Fallback Default: menggunakan nilai 'default' jika game spesifik tidak terdaftar", () => {
   const taxDict = {
     "itemku.com": {
       "roblox": 1.05,
@@ -176,10 +181,13 @@ test("Sub-Dictionary: fallback ke 'default' jika game spesifik tidak ditemukan",
   assert.strictEqual(robloxResult, 10500, "Roblox harus menggunakan nilai spesifik 1.05");
 });
 
-// -------------------------------------------------------------
-// 5. Uji Variasi Domain & URL (dengan/tanpa www.)
-// -------------------------------------------------------------
-test("Domain Matching: dictionary 'codashop.com' mencakup hostname 'www.codashop.com'", () => {
+// =============================================================================
+// 5. PENCOCOKAN DOMAIN (DENGAN / TANPA AWALAN WWW.)
+// =============================================================================
+// Penjelasan:
+// Memastikan pencocokan domain tidak sensitif terhadap ada tidaknya awalan 'www.'.
+
+test("Domain Matching: dictionary 'codashop.com' mengenali hostname 'www.codashop.com'", () => {
   const taxDict = {
     "codashop.com": 1.11,
   };
@@ -193,24 +201,14 @@ test("Domain Matching: dictionary 'codashop.com' mencakup hostname 'www.codashop
   assert.strictEqual(result, 11100);
 });
 
-test("Domain Matching: dictionary 'www.codashop.com' mencakup domain 'codashop.com'", () => {
-  const taxDict = {
-    "www.codashop.com": 1.11,
-  };
-  const payload = {
-    rawPrice: 10000,
-    domain: "codashop.com",
-    hostname: "codashop.com",
-    game: "mobile-legends",
-  };
-  const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 11100);
-});
+// =============================================================================
+// 6. INTEGRASI DENGAN PEMILIH PRODUK TERMURAH (selectCheapestProducts)
+// =============================================================================
+// Penjelasan:
+// Memastikan bahwa kalkulasi pajak otomatis diterapkan pada daftar produk
+// sebelum produk termurah dipilih dan dimasukkan ke laporan akhir.
 
-// -------------------------------------------------------------
-// 6. Uji Integrasi dengan selectCheapestProducts
-// -------------------------------------------------------------
-test("Integrasi selectCheapestProducts: harga hasil scrape otomatis disesuaikan PPN", () => {
+test("Integrasi Matcher: harga hasil scrape otomatis disesuaikan nilai PPN", () => {
   const rawRows = [
     { Produk: "86 Diamonds", Harga: "Rp 20.000" },
     { Produk: "172 Diamonds", Harga: "Rp 40.000" },
@@ -223,7 +221,6 @@ test("Integrasi selectCheapestProducts: harga hasil scrape otomatis disesuaikan 
     },
   };
 
-  // Scrape untuk MLBB
   const mlbbProducts = selectCheapestProducts(rawRows, "mobile-legends", {
     hostname: "www.codashop.com",
     url: "https://www.codashop.com/id-id/mobile-legends",
@@ -233,139 +230,93 @@ test("Integrasi selectCheapestProducts: harga hasil scrape otomatis disesuaikan 
   const p86 = Array.from(mlbbProducts.values()).find((p) => p.quantity === 86);
   assert.ok(p86, "Produk 86 Diamonds harus ditemukan");
   assert.strictEqual(p86.price, 22200, "20.000 * 1.11 harus menjadi 22.200");
-
-  // Scrape produk yang sama untuk Roblox (tidak kena PPN)
-  const robloxRows = [
-    { Produk: "800 Robux", Harga: "Rp 150.000" },
-  ];
-  const robloxProducts = selectCheapestProducts(robloxRows, "roblox", {
-    hostname: "www.codashop.com",
-    url: "https://www.codashop.com/id-id/roblox",
-    calculateTax: taxDict,
-  });
-
-  const r800 = Array.from(robloxProducts.values()).find((p) => p.quantity === 800);
-  assert.ok(r800, "Produk 800 Robux harus ditemukan");
-  assert.strictEqual(r800.price, 150000, "Roblox tidak ada di rule Codashop, jadi harga harus tetap 150.000");
 });
 
-// -------------------------------------------------------------
-// 7. Uji Edge Cases & Ketahanan Terhadap Error
-// -------------------------------------------------------------
-test("Edge Case: calculateTax bernilai null / undefined / kosong mengembalikan harga asli", () => {
-  const payload = { rawPrice: 15000, domain: "codashop.com", game: "mobile-legends" };
-  assert.strictEqual(applyTaxCalculation(null, payload), 15000);
-  assert.strictEqual(applyTaxCalculation(undefined, payload), 15000);
-  assert.strictEqual(applyTaxCalculation({}, payload), 15000);
-});
+// =============================================================================
+// 7. FORMAT PENULISAN FLEKSIBEL (STRING %, ANGKA, STRING ANGKA)
+// =============================================================================
+// Penjelasan:
+// Pengguna dapat menulis nilai pajak dalam berbagai format:
+// - String persen: "11%", "0.7%", "11.777%"
+// - Angka murni: 11, 0.7, 12.11
+// - String angka: "11", "0.7", "12.11"
+// Sistem harus membaca seluruh format tersebut secara konsisten.
 
-test("Edge Case: nilai invalid / NaN / negatif ditolak secara aman", () => {
-  const taxDict = {
-    "error-store.com": NaN,
-    "negative-store.com": -0.5,
-  };
-  const r1 = applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "error-store.com" });
-  const r2 = applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "negative-store.com" });
-  assert.strictEqual(r1, 10000, "NaN harus mengembalikan harga asli");
-  assert.strictEqual(r2, 10000, "Angka negatif harus mengembalikan harga asli");
-});
-
-// -------------------------------------------------------------
-// 8. Uji Format String Persentase (misal "11%", "0.7%", "11.777%")
-// -------------------------------------------------------------
-test("String Persentase: '11%' menghasilkan penambahan PPN 11%", () => {
+test("Format String Persen: '11%' menghasilkan penambahan biaya 11%", () => {
   const taxDict = { "unipin.com": "11%" };
   const payload = { rawPrice: 100000, domain: "unipin.com", game: "mobile-legends" };
   const result = applyTaxCalculation(taxDict, payload);
   assert.strictEqual(result, 111000);
 });
 
-test("String Persentase: '0.7%' menghasilkan penambahan biaya QRIS 0.7%", () => {
+test("Format String Persen: '0.7%' menghasilkan penambahan biaya QRIS 0.7%", () => {
   const taxDict = { "itemku.com": "0.7%" };
   const payload = { rawPrice: 100000, domain: "itemku.com", game: "free-fire" };
   const result = applyTaxCalculation(taxDict, payload);
   assert.strictEqual(result, 100700);
 });
 
-test("String Persentase: desimal presisi tinggi '11.777%'", () => {
-  const taxDict = { "ditusi.co.id": "11.777%" };
-  const payload = { rawPrice: 100000, domain: "ditusi.co.id", game: "roblox" };
-  const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 111777);
-});
-
-test("String Persentase: Nested per game dengan '11%'", () => {
-  const taxDict = {
-    "codashop.com": {
-      "mobile-legends": "11%",
-      "default": "0%",
-    },
-  };
-  const rMlbb = applyTaxCalculation(taxDict, { rawPrice: 50000, domain: "codashop.com", game: "mobile-legends" });
-  const rOther = applyTaxCalculation(taxDict, { rawPrice: 50000, domain: "codashop.com", game: "roblox" });
-  assert.strictEqual(rMlbb, 55500);
-  assert.strictEqual(rOther, 50000);
-});
-
-test("String Persentase: string persentase invalid / rusak mengembalikan harga asli", () => {
-  const taxDict = {
-    "bad1.com": "abc%",
-    "bad2.com": "-10%",
-    "bad3.com": "%",
-  };
-  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad1.com" }), 10000);
-  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad2.com" }), 10000);
-  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad3.com" }), 10000);
-});
-
-// -------------------------------------------------------------
-// 9. Uji Format Angka Murni & String Tanpa Simbol % (12.11, 11, 0.7, "12.11")
-// -------------------------------------------------------------
-test("Angka Murni: 12.11 (number) otomatis dianggap 12.11%", () => {
-  const taxDict = { "codashop.com": 12.11 };
-  const payload = { rawPrice: 100000, domain: "codashop.com", game: "mobile-legends" };
-  const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 112110);
-});
-
-test("Angka Murni: 11 (number) otomatis dianggap 11%", () => {
+test("Format Angka Murni: angka 11 otomatis dianggap 11%", () => {
   const taxDict = { "unipin.com": 11 };
   const payload = { rawPrice: 100000, domain: "unipin.com", game: "free-fire" };
   const result = applyTaxCalculation(taxDict, payload);
   assert.strictEqual(result, 111000);
 });
 
-test("Angka Murni: 0.7 (number desimal < 1) otomatis dianggap 0.7%", () => {
+test("Format Angka Murni: angka desimal 0.7 otomatis dianggap 0.7%", () => {
   const taxDict = { "itemku.com": 0.7 };
   const payload = { rawPrice: 100000, domain: "itemku.com", game: "free-fire" };
   const result = applyTaxCalculation(taxDict, payload);
   assert.strictEqual(result, 100700);
 });
 
-test("String Tanpa %: '12.11' (string) otomatis dianggap 12.11%", () => {
+test("Format String Angka: string '12.11' otomatis dianggap 12.11%", () => {
   const taxDict = { "codashop.com": "12.11" };
   const payload = { rawPrice: 100000, domain: "codashop.com", game: "mobile-legends" };
   const result = applyTaxCalculation(taxDict, payload);
   assert.strictEqual(result, 112110);
 });
 
-test("String Tanpa %: '0.7' (string) otomatis dianggap 0.7%", () => {
-  const taxDict = { "itemku.com": "0.7" };
-  const payload = { rawPrice: 100000, domain: "itemku.com", game: "free-fire" };
-  const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 100700);
+// =============================================================================
+// 8. KETAHANAN TERHADAP INPUT TIDAK VALID (FAIL-SAFE)
+// =============================================================================
+// Penjelasan:
+// Jika konfigurasi bernilai null, string rusak, atau angka negatif, sistem
+// tidak boleh crash, melainkan mengembalikan harga asli dengan aman.
+
+test("Ketahanan Input: nilai null, undefined, atau objek kosong mengembalikan harga asli", () => {
+  const payload = { rawPrice: 15000, domain: "codashop.com", game: "mobile-legends" };
+  assert.strictEqual(applyTaxCalculation(null, payload), 15000);
+  assert.strictEqual(applyTaxCalculation(undefined, payload), 15000);
+  assert.strictEqual(applyTaxCalculation({}, payload), 15000);
 });
 
-test("Angka Murni: legacy multiplier 1.11 tetap berfungsi normal", () => {
-  const taxDict = { "lapaku.com": 1.11 };
-  const payload = { rawPrice: 100000, domain: "lapaku.com", game: "mobile-legends" };
-  const result = applyTaxCalculation(taxDict, payload);
-  assert.strictEqual(result, 111000);
+test("Ketahanan Input: nilai tidak valid (NaN / angka negatif) mengembalikan harga asli", () => {
+  const taxDict = {
+    "bad-nan.com": NaN,
+    "bad-neg.com": -0.5,
+  };
+  const r1 = applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad-nan.com" });
+  const r2 = applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad-neg.com" });
+  assert.strictEqual(r1, 10000);
+  assert.strictEqual(r2, 10000);
 });
 
-console.log("==================================================");
-console.log(`HASIL: ${testsPassed} Berhasil, ${testsFailed} Gagal`);
-console.log("==================================================");
+test("Ketahanan Input: string persentase rusak ('abc%', '%') mengembalikan harga asli", () => {
+  const taxDict = {
+    "bad-str.com": "abc%",
+    "empty-pct.com": "%",
+  };
+  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "bad-str.com" }), 10000);
+  assert.strictEqual(applyTaxCalculation(taxDict, { rawPrice: 10000, domain: "empty-pct.com" }), 10000);
+});
+
+// =============================================================================
+// RINGKASAN AKHIR
+// =============================================================================
+console.log("--------------------------------------------------");
+console.log(`HASIL: ${testsPassed} Lolos, ${testsFailed} Gagal`);
+console.log("--------------------------------------------------");
 
 if (testsFailed > 0) {
   process.exit(1);

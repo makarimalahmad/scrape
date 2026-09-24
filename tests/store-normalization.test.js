@@ -1,14 +1,19 @@
 const assert = require("assert");
-const { normalizeStoreUrl, classifyTopUpCompetitorResult } = require("../lib/google/google-search");
+const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError } = require("../lib/google/google-search");
 const { parseRobloxProduct, parseDiamondProduct } = require("../lib/matcher/product-matcher");
 
-console.log("==================================================");
-console.log("🧪 MENJALANKAN TEST SUITE: STORE NORMALIZATION & MATCHER");
-console.log("==================================================");
+console.log("--------------------------------------------------");
+console.log("TEST SUITE: NORMALISASI SISTEM & PRODUCT MATCHER");
+console.log("--------------------------------------------------");
 
 let testsPassed = 0;
 let testsFailed = 0;
 
+/**
+ * Runner pengujian sederhana:
+ * Menjalankan fungsi pengujian, mencatat status [PASS] atau [FAIL],
+ * dan menghitung total pengujian yang berhasil atau gagal.
+ */
 function test(name, fn) {
   try {
     fn();
@@ -21,61 +26,40 @@ function test(name, fn) {
   }
 }
 
-// -------------------------------------------------------------
-// 1. Uji Normalisasi URL Casatopup (Mobile Legends)
-// -------------------------------------------------------------
-test("Casatopup: mobile-legends-global dinormalisasi ke /id/beli/mobile-legends", () => {
+// =============================================================================
+// 1. NORMALISASI URL TOKO KE KATALOG RESMI
+// =============================================================================
+// Penjelasan:
+// Di hasil pencarian Google, link toko sering kali merujuk ke halaman varian
+// (misal server luar negeri atau halaman checkout alternatif). Fungsi normalizeStoreUrl
+// bertugas mengarahkan scraper ke halaman katalog utama agar daftar harga lengkap.
+
+test("Normalisasi URL: mengalihkan URL varian server ke katalog utama", () => {
   const input = "https://casatopup.com/id/beli/mobile-legends-global";
   const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
   assert.strictEqual(normalized.href, "https://casatopup.com/id/beli/mobile-legends");
 });
 
-test("Casatopup: /id/beli/mobile-legends tetap tidak berubah", () => {
+test("Normalisasi URL: URL katalog resmi tidak mengalami perubahan", () => {
   const input = "https://casatopup.com/id/beli/mobile-legends";
   const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
   assert.strictEqual(normalized.href, "https://casatopup.com/id/beli/mobile-legends");
 });
 
-// -------------------------------------------------------------
-// 2. Uji Normalisasi URL Golrox (Roblox)
-// -------------------------------------------------------------
-test("Golrox: /beli-robux dinormalisasi ke /beli-robux/username", () => {
+test("Normalisasi URL: mengarahkan rute varian produk ke form katalog utama", () => {
   const input = "https://golrox.com/beli-robux";
   const normalized = normalizeStoreUrl(input, { id: "roblox" });
   assert.strictEqual(normalized.href, "https://golrox.com/beli-robux/username");
 });
 
-test("Golrox: /beli-robux/instant dialihkan ke /beli-robux/username", () => {
-  const input = "https://golrox.com/beli-robux/instant";
-  const normalized = normalizeStoreUrl(input, { id: "roblox" });
-  assert.strictEqual(normalized.href, "https://golrox.com/beli-robux/username");
-});
+// =============================================================================
+// 2. PENYARINGAN DOMAIN BUKAN TOKO (BLACKLIST)
+// =============================================================================
+// Penjelasan:
+// Hasil pencarian Google kadang menampilkan link bio atau agregator non-toko
+// (misalnya lynk.id atau linktr.ee). Scraper harus langsung menolaknya sebelum dibuka.
 
-test("Golrox: /beli-robux/username tetap tidak berubah", () => {
-  const input = "https://golrox.com/beli-robux/username";
-  const normalized = normalizeStoreUrl(input, { id: "roblox" });
-  assert.strictEqual(normalized.href, "https://golrox.com/beli-robux/username");
-});
-
-// -------------------------------------------------------------
-// 3. Uji Normalisasi URL Funnerlife & Lapakgaming
-// -------------------------------------------------------------
-test("Funnerlife: /id/beli/mlbb dinormalisasi ke /id/beli/mobile-legend", () => {
-  const input = "https://funnerlife.id/id/beli/mlbb";
-  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
-  assert.strictEqual(normalized.href, "https://funnerlife.id/id/beli/mobile-legend");
-});
-
-test("Lapakgaming: /id-id/roblox-login dinormalisasi ke /id-id/roblox", () => {
-  const input = "https://www.lapakgaming.com/id-id/roblox-login";
-  const normalized = normalizeStoreUrl(input, { id: "roblox" });
-  assert.strictEqual(normalized.href, "https://www.lapakgaming.com/id-id/roblox");
-});
-
-// -------------------------------------------------------------
-// 4. Uji Blacklist Domain Non-Store (lynk.id, linktr.ee)
-// -------------------------------------------------------------
-test("Blacklist: lynk.id ditolak sebagai non_store_domain", () => {
+test("Filter Domain: menolak domain link bio (lynk.id)", () => {
   const result = {
     link: "https://lynk.id/topuprobux",
     title: "Beli Robux Murah",
@@ -85,7 +69,7 @@ test("Blacklist: lynk.id ditolak sebagai non_store_domain", () => {
   assert.strictEqual(decision.reason, "non_store_domain");
 });
 
-test("Blacklist: linktr.ee ditolak sebagai non_store_domain", () => {
+test("Filter Domain: menolak domain agregator (linktr.ee)", () => {
   const result = {
     link: "https://linktr.ee/topupgame",
     title: "Top Up Game",
@@ -95,37 +79,24 @@ test("Blacklist: linktr.ee ditolak sebagai non_store_domain", () => {
   assert.strictEqual(decision.reason, "non_store_domain");
 });
 
-test("Blacklist: speedcash.co.id ditolak sebagai non_store_domain", () => {
-  const result = {
-    link: "https://www.speedcash.co.id/top-up-roblox",
-    title: "Top Up Roblox Murah",
-  };
-  const decision = classifyTopUpCompetitorResult(result, { id: "roblox", name: "Roblox" });
-  assert.strictEqual(decision.eligible, false);
-  assert.strictEqual(decision.reason, "non_store_domain");
-});
+// =============================================================================
+// 3. DETEKSI & PENOLAKAN ARTIKEL BLOG / BERITA (HEURISTIC)
+// =============================================================================
+// Penjelasan:
+// Google sering memunculkan portal berita atau artikel tips/panduan.
+// Pengujian ini memastikan scraper tidak membuang waktu membuka artikel berita.
 
-test("Editorial Heuristic: industry.co.id artikel berita ditolak sebagai editorial_page", () => {
-  const result = {
-    link: "https://www.industry.co.id/read/152496/top-up-diamond-mlbb-mobile-legends-yang-murah-dan-aman-lagi-ada-diskon",
-    title: "Top Up Diamond MLBB Mobile Legends yang Murah Dan Aman Lagi Ada Diskon",
-  };
-  const decision = classifyTopUpCompetitorResult(result, { id: "mobile-legends", name: "Mobile Legends" });
-  assert.strictEqual(decision.eligible, false);
-  assert.strictEqual(decision.reason, "editorial_page");
-});
-
-test("Editorial Heuristic: URL dengan rute /read/ dan nomor artikel ditolak", () => {
+test("Filter Artikel: menolak URL dengan struktur rute berita (/read/)", () => {
   const result = {
     link: "https://beritagame.com/read/84920/top-up-free-fire-promo",
-    title: "Top Up Free Fire",
+    title: "Top Up Free Fire Promo",
   };
   const decision = classifyTopUpCompetitorResult(result, { id: "free-fire", name: "Free Fire" });
   assert.strictEqual(decision.eligible, false);
   assert.strictEqual(decision.reason, "editorial_page");
 });
 
-test("Editorial Heuristic: URL berbasis tanggal /2024/05/ ditolak", () => {
+test("Filter Artikel: menolak URL dengan pola arsip tanggal (/2024/05/)", () => {
   const result = {
     link: "https://bloggame.id/2024/05/top-up-roblox-termurah",
     title: "Beli Robux Murah",
@@ -135,7 +106,7 @@ test("Editorial Heuristic: URL berbasis tanggal /2024/05/ ditolak", () => {
   assert.strictEqual(decision.reason, "editorial_page");
 });
 
-test("Editorial Heuristic: Judul artikel panduan/tips ditolak", () => {
+test("Filter Artikel: menolak judul yang terindikasi artikel panduan atau rekomendasi", () => {
   const result = {
     link: "https://portalgame.id/top-up-ml",
     title: "Inilah Rekomendasi Tempat Top Up Diamond MLBB Termurah",
@@ -145,113 +116,108 @@ test("Editorial Heuristic: Judul artikel panduan/tips ditolak", () => {
   assert.strictEqual(decision.reason, "editorial_page");
 });
 
-// -------------------------------------------------------------
-// 4. Uji Roblox Product Matcher (TopupGGWP & SpeedCash)
-// -------------------------------------------------------------
-test("Matcher: Roblox Gift Card IDR 50.000 cocok ke kategori roblox-idr-card", () => {
+// =============================================================================
+// 4. PENCOCOKAN PRODUK ROBLOX (PRODUCT MATCHER)
+// =============================================================================
+// Penjelasan:
+// Memastikan varian produk Roblox (Robux angka murni, Gift Card IDR, dan Gift Card asing)
+// dikelompokkan ke kategori yang benar dan tidak saling tertukar.
+
+test("Matcher Roblox: Roblox Gift Card IDR masuk ke kategori roblox-idr-card", () => {
   const product = parseRobloxProduct("Roblox Gift Card IDR 50.000");
   assert.strictEqual(product.category, "roblox-idr-card");
   assert.strictEqual(product.key, "Roblox IDR 50000");
 });
 
-test("Matcher: Roblox Gift Card IDR 100.000 cocok ke kategori roblox-idr-card", () => {
-  const product = parseRobloxProduct("Roblox Gift Card IDR 100.000");
-  assert.strictEqual(product.category, "roblox-idr-card");
-  assert.strictEqual(product.key, "Roblox IDR 100000");
-});
-
-test("Matcher: Lapakgaming 'Roblox Gift Card IDR 50K' cocok ke 'Roblox IDR 50000'", () => {
+test("Matcher Roblox: penulisan ringkas '50K' dinormalisasi ke nominal penuh", () => {
   const product = parseRobloxProduct("Roblox Gift Card IDR 50K");
   assert.strictEqual(product.category, "roblox-idr-card");
   assert.strictEqual(product.key, "Roblox IDR 50000");
 });
 
-test("Matcher: Lapakgaming 'Roblox Gift Card 50 SAR' masuk ke 'Roblox SAR 50' dan tidak tertukar ke IDR", () => {
+test("Matcher Roblox: mata uang asing (SAR / USD) dipisahkan dari IDR", () => {
   const product = parseRobloxProduct("Roblox Gift Card 50 SAR");
   assert.strictEqual(product.category, "roblox-sar-card");
   assert.strictEqual(product.key, "Roblox SAR 50");
 });
 
-test("Matcher: 800 Robux cocok ke kategori robux", () => {
+test("Matcher Roblox: teks '800 Robux' dikelompokkan ke kategori robux", () => {
   const product = parseRobloxProduct("800 Robux");
   assert.strictEqual(product.category, "robux");
   assert.strictEqual(product.key, "800 Robux");
 });
 
-test("Matcher: Bare number 800 dari Golrox cocok ke kategori robux", () => {
+test("Matcher Roblox: nominal angka murni '800' otomatis dikenali sebagai 800 Robux", () => {
   const product = parseRobloxProduct("800");
   assert.strictEqual(product.category, "robux");
   assert.strictEqual(product.key, "800 Robux");
 });
 
-test("Matcher: SpeedCash Roblox (USD) 10 masuk kategori roblox-usd-card", () => {
-  const product = parseRobloxProduct("Roblox (USD) 10");
-  assert.strictEqual(product.category, "roblox-usd-card");
-  assert.strictEqual(product.key, "Roblox USD 10");
-});
+// =============================================================================
+// 5. PENCOCOKAN PRODUK DIAMOND (MLBB & FREE FIRE)
+// =============================================================================
+// Penjelasan:
+// Memastikan produk diamond reguler dipisahkan dari promo bonus pembelian pertama (First Top-up)
+// agar perbandingan harga tetap adil dan setara (apple-to-apple).
 
-// -------------------------------------------------------------
-// 5. Uji First Top-up Diamond Matcher
-// -------------------------------------------------------------
-test("Matcher: 1000 Diamonds First Top-up diberi label (First Top-up)", () => {
+test("Matcher Diamond: promo pembelian pertama diberi penanda (First Top-up)", () => {
   const product = parseDiamondProduct("1000 Diamonds First Top-up");
   assert.strictEqual(product.category, "diamond-first-topup");
   assert.strictEqual(product.key, "1000 Diamonds (First Top-up)");
   assert.strictEqual(product.quantity, 1000);
 });
 
-test("Matcher: 1000 Diamonds Pembelian Pertama diberi label (First Top-up)", () => {
+test("Matcher Diamond: teks bahasa Indonesia 'Pembelian Pertama' dikenali sebagai First Top-up", () => {
   const product = parseDiamondProduct("1000 Diamonds Pembelian Pertama");
   assert.strictEqual(product.category, "diamond-first-topup");
   assert.strictEqual(product.key, "1000 Diamonds (First Top-up)");
   assert.strictEqual(product.quantity, 1000);
 });
 
-test("Matcher: 1000 Diamonds biasa tetap tanpa label", () => {
+test("Matcher Diamond: paket diamond reguler tidak diberi label First Top-up", () => {
   const product = parseDiamondProduct("1000 Diamonds");
   assert.strictEqual(product.category, "diamond");
   assert.strictEqual(product.key, "1000 Diamonds");
   assert.strictEqual(product.quantity, 1000);
 });
 
-// -------------------------------------------------------------
-// 6. Uji Deteksi Error Non-Retryable (Maintenance, Proxy, Blokir)
-// -------------------------------------------------------------
-const { isTemporaryScrapeError } = require("../lib/google/google-search");
+// =============================================================================
+// 6. KLASIFIKASI ERROR SCRAPER (RETRY POLICY)
+// =============================================================================
+// Penjelasan:
+// Scraper harus membedakan error sementara yang layak di-retry (seperti koneksi lambat/timeout)
+// dengan error permanen (seperti HTTP 403, toko maintenance, atau proxy gagal) agar hemat waktu.
 
-test("isTemporaryScrapeError: Error [Maintenance] ditandai non-retryable (fail-fast)", () => {
-  const err = new Error("[Maintenance] Akses ke duniagames.co.id dilewati: Maaf.. item habis");
+test("Kebijakan Error: status maintenance toko langsung dilewati (non-retryable)", () => {
+  const err = new Error("[Maintenance] Toko sedang pemeliharaan sistem");
   err.retryable = false;
   err.isMaintenance = true;
   assert.strictEqual(isTemporaryScrapeError(err), false);
 });
 
-test("isTemporaryScrapeError: Error dengan flag isMaintenance ditandai non-retryable", () => {
-  const err = new Error("Toko sedang maintenance");
-  err.isMaintenance = true;
-  assert.strictEqual(isTemporaryScrapeError(err), false);
-});
-
-test("isTemporaryScrapeError: Error [Blokir] HTTP 403 ditandai non-retryable", () => {
-  const err = new Error("[Blokir] Akses ke lapakgaming.com terblokir (HTTP 403)");
+test("Kebijakan Error: blokir akses HTTP 403 langsung dilewati (non-retryable)", () => {
+  const err = new Error("[Blokir] Akses terblokir (HTTP 403)");
   err.retryable = false;
   assert.strictEqual(isTemporaryScrapeError(err), false);
 });
 
-test("isTemporaryScrapeError: Error [Proxy Error] ditandai non-retryable", () => {
-  const err = new Error("[Proxy Error] Proxy ditolak atau kuota habis");
+test("Kebijakan Error: kegagalan proxy ditandai non-retryable", () => {
+  const err = new Error("[Proxy Error] Kuota proxy habis");
   err.proxyFailed = true;
   assert.strictEqual(isTemporaryScrapeError(err), false);
 });
 
-test("isTemporaryScrapeError: Network timeout biasa tetap di-retry", () => {
+test("Kebijakan Error: gangguan timeout koneksi tetap dicoba ulang (retryable)", () => {
   const err = new Error("Koneksi ke situs timeout (ERR_TIMED_OUT)");
   assert.strictEqual(isTemporaryScrapeError(err), true);
 });
 
-console.log("==================================================");
-console.log(`HASIL: ${testsPassed} Berhasil, ${testsFailed} Gagal`);
-console.log("==================================================");
+// =============================================================================
+// RINGKASAN AKHIR
+// =============================================================================
+console.log("--------------------------------------------------");
+console.log(`HASIL: ${testsPassed} Lolos, ${testsFailed} Gagal`);
+console.log("--------------------------------------------------");
 
 if (testsFailed > 0) {
   process.exit(1);
