@@ -228,9 +228,13 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * @returns {Promise<Object>} Structured comparison data with anchors and store pricing
  */
 async function compareGame(gameId, options = {}) {
-  const apiKey = options.apiKey || process.env.SERPAPI_KEY;
+  let provider = (options.provider || process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY && !process.env.SERPAPI_KEY ? "brightdata" : "serpapi")).toLowerCase();
+  if (provider === "brightdata" && !process.env.BRIGHTDATA_API_KEY && (options.apiKey || process.env.SERPAPI_KEY)) {
+    provider = "serpapi";
+  }
+  const apiKey = options.apiKey || (provider === "brightdata" ? process.env.BRIGHTDATA_API_KEY : process.env.SERPAPI_KEY);
   if (!apiKey) {
-    throw new Error("SERPAPI_KEY required for Google comparison.");
+    throw new Error(provider === "brightdata" ? "BRIGHTDATA_API_KEY required for Google comparison." : "SERPAPI_KEY required for Google comparison.");
   }
 
   const gameConfig = GAME_CONFIGS.find(
