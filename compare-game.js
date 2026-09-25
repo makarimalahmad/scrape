@@ -586,16 +586,17 @@ async function main() {
   let provider = (process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY && !process.env.SERPAPI_KEY ? "brightdata" : "serpapi")).toLowerCase();
   if (provider === "brightdata" && !process.env.BRIGHTDATA_API_KEY && process.env.SERPAPI_KEY) {
     provider = "serpapi";
+    process.env.SERP_PROVIDER = "serpapi";
+  } else if (provider === "serpapi" && !process.env.SERPAPI_KEY && process.env.BRIGHTDATA_API_KEY) {
+    provider = "brightdata";
+    process.env.SERP_PROVIDER = "brightdata";
   }
   const apiKey = provider === "brightdata"
     ? process.env.BRIGHTDATA_API_KEY
     : process.env.SERPAPI_KEY;
 
   if (!apiKey) {
-    if (provider === "brightdata") {
-      throw new Error("BRIGHTDATA_API_KEY belum diatur di .env.");
-    }
-    throw new Error("SERPAPI_KEY belum diatur di .env.");
+    throw new Error("Setidaknya salah satu kunci (BRIGHTDATA_API_KEY atau SERPAPI_KEY) harus diatur di .env.");
   }
 
   const gameId = getArgument("game");

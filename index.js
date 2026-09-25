@@ -231,10 +231,14 @@ async function compareGame(gameId, options = {}) {
   let provider = (options.provider || process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY && !process.env.SERPAPI_KEY ? "brightdata" : "serpapi")).toLowerCase();
   if (provider === "brightdata" && !process.env.BRIGHTDATA_API_KEY && (options.apiKey || process.env.SERPAPI_KEY)) {
     provider = "serpapi";
+    process.env.SERP_PROVIDER = "serpapi";
+  } else if (provider === "serpapi" && !options.apiKey && !process.env.SERPAPI_KEY && process.env.BRIGHTDATA_API_KEY) {
+    provider = "brightdata";
+    process.env.SERP_PROVIDER = "brightdata";
   }
-  const apiKey = options.apiKey || (provider === "brightdata" ? process.env.BRIGHTDATA_API_KEY : process.env.SERPAPI_KEY);
+  const apiKey = options.apiKey || (provider === "brightdata" ? (process.env.BRIGHTDATA_API_KEY || process.env.SERPAPI_KEY) : (process.env.SERPAPI_KEY || process.env.BRIGHTDATA_API_KEY));
   if (!apiKey) {
-    throw new Error(provider === "brightdata" ? "BRIGHTDATA_API_KEY required for Google comparison." : "SERPAPI_KEY required for Google comparison.");
+    throw new Error("Setidaknya salah satu kunci (BRIGHTDATA_API_KEY atau SERPAPI_KEY) harus diatur.");
   }
 
   const gameConfig = GAME_CONFIGS.find(
