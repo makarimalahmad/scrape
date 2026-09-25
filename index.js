@@ -228,11 +228,13 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * @returns {Promise<Object>} Structured comparison data with anchors and store pricing
  */
 async function compareGame(gameId, options = {}) {
-  let provider = (options.provider || process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY ? "brightdata" : "serpapi")).toLowerCase();
+  let provider = (options.provider || process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY && !process.env.SERPAPI_KEY ? "brightdata" : "serpapi")).toLowerCase();
   if (provider === "brightdata" && !process.env.BRIGHTDATA_API_KEY && (options.apiKey || process.env.SERPAPI_KEY)) {
     provider = "serpapi";
+    process.env.SERP_PROVIDER = "serpapi";
   } else if (provider === "serpapi" && !options.apiKey && !process.env.SERPAPI_KEY && process.env.BRIGHTDATA_API_KEY) {
     provider = "brightdata";
+    process.env.SERP_PROVIDER = "brightdata";
   }
   const apiKey = options.apiKey || (provider === "brightdata" ? (process.env.BRIGHTDATA_API_KEY || process.env.SERPAPI_KEY) : (process.env.SERPAPI_KEY || process.env.BRIGHTDATA_API_KEY));
   if (!apiKey) {
