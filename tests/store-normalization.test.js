@@ -1,6 +1,7 @@
 const assert = require("assert");
 const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError } = require("../lib/google/google-search");
 const { parseRobloxProduct, parseDiamondProduct } = require("../lib/matcher/product-matcher");
+const { validateScrapeResults } = require("../lib/validation/validate-results");
 
 console.log("--------------------------------------------------");
 console.log("TEST SUITE: NORMALISASI SISTEM & PRODUCT MATCHER");
@@ -151,6 +152,32 @@ test("Matcher Roblox: nominal angka murni '800' otomatis dikenali sebagai 800 Ro
   const product = parseRobloxProduct("800");
   assert.strictEqual(product.category, "robux");
   assert.strictEqual(product.key, "800 Robux");
+});
+
+test("Matcher Roblox: format singkatan '500 RBX' cocok ke '500 Robux'", () => {
+  const product = parseRobloxProduct("500 RBX");
+  assert.strictEqual(product.category, "robux");
+  assert.strictEqual(product.key, "500 Robux");
+  assert.strictEqual(product.quantity, 500);
+});
+
+test("Matcher Roblox: format prefix 'RBX 2000' cocok ke '2000 Robux'", () => {
+  const product = parseRobloxProduct("RBX 2000");
+  assert.strictEqual(product.category, "robux");
+  assert.strictEqual(product.key, "2000 Robux");
+  assert.strictEqual(product.quantity, 2000);
+});
+
+test("Validator Roblox: produk dengan format RBX (Lootbar) diakui sebagai data valid", () => {
+  const rows = [
+    { Produk: "500 RBX", Harga: "Rp 80.309" },
+    { Produk: "1000 RBX", Harga: "Rp 160.618" },
+    { Produk: "RBX 2000", Harga: "Rp 321.236" },
+    { Produk: "4500 RBX", Harga: "Rp 803.090" },
+  ];
+  const validation = validateScrapeResults("https://www.lootbar.com/id/top-up/roblox-robux", rows, "roblox");
+  assert.strictEqual(validation.valid, true);
+  assert.strictEqual(validation.status, "VALID");
 });
 
 // =============================================================================
