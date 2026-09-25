@@ -583,13 +583,11 @@ async function processGame(apiKey, gameConfig, options) {
 }
 
 async function main() {
-  let provider = (process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY && !process.env.SERPAPI_KEY ? "brightdata" : "serpapi")).toLowerCase();
+  let provider = (process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY ? "brightdata" : "serpapi")).toLowerCase();
   if (provider === "brightdata" && !process.env.BRIGHTDATA_API_KEY && process.env.SERPAPI_KEY) {
     provider = "serpapi";
-    process.env.SERP_PROVIDER = "serpapi";
   } else if (provider === "serpapi" && !process.env.SERPAPI_KEY && process.env.BRIGHTDATA_API_KEY) {
     provider = "brightdata";
-    process.env.SERP_PROVIDER = "brightdata";
   }
   const apiKey = provider === "brightdata"
     ? process.env.BRIGHTDATA_API_KEY
