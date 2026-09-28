@@ -117,6 +117,57 @@ test("Filter Artikel: menolak judul yang terindikasi artikel panduan atau rekome
   assert.strictEqual(decision.reason, "editorial_page");
 });
 
+test("Filter Artikel: menolak URL portal berita tanpa slash setelah read (/read538820/)", () => {
+  const result = {
+    link: "https://wartaekonomi.co.id/read538820/banyak-benefitnya-alasan-pemain-free-fire-harus-top-up-ff",
+    title: "Banyak Benefitnya, Alasan Pemain Free Fire Harus Top Up FF",
+    snippet: "Banyak pemain Free Fire yang ingin top up FF...",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "free-fire", name: "Free Fire" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "editorial_page");
+});
+
+test("Filter Domain: menolak domain translate.google.com sebagai non_store_domain", () => {
+  const result = {
+    link: "https://translate.google.com/translate?u=https://www.codashop.com/id-id/free-fire&hl=id",
+    title: "Top up FF Murah | Promo Terbaru | Codashop ID",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "free-fire", name: "Free Fire" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
+test("Filter Domain: menolak domain chat wa.me sebagai non_store_domain", () => {
+  const result = {
+    link: "https://wa.me/melookyu?lang=id_ID",
+    title: "Top Up Robux Murah",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "roblox", name: "Roblox" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
+test("Filter Domain: menolak domain asing spam TLD (.pl)", () => {
+  const result = {
+    link: "https://www.siemabanda.pl/divegawey",
+    title: "Top Up Diamond MLBB Murah",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "mobile-legends", name: "Mobile Legends" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
+test("Filter Domain: menolak domain promo non-toko (doku.promo)", () => {
+  const result = {
+    link: "https://doku.promo/top-up-roblox-dapat-cashback",
+    title: "Top Up Roblox Dapat Cashback",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "roblox", name: "Roblox" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
 // =============================================================================
 // 4. PENCOCOKAN PRODUK ROBLOX (PRODUCT MATCHER)
 // =============================================================================
