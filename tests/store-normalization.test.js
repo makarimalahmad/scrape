@@ -1,7 +1,7 @@
 const assert = require("assert");
 const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError } = require("../lib/google/google-search");
-const { parseRobloxProduct, parseDiamondProduct } = require("../lib/matcher/product-matcher");
-const { validateScrapeResults } = require("../lib/validation/validate-results");
+const { parseRobloxProduct, parseDiamondProduct, parseNamedProduct } = require("../lib/matcher/product-matcher");
+const { validateScrapeResults, isKnownDomain } = require("../lib/validation/validate-results");
 
 console.log("--------------------------------------------------");
 console.log("TEST SUITE: NORMALISASI SISTEM & PRODUCT MATCHER");
@@ -51,6 +51,57 @@ test("Normalisasi URL: mengarahkan rute varian produk ke form katalog utama", ()
   const input = "https://golrox.com/beli-robux";
   const normalized = normalizeStoreUrl(input, { id: "roblox" });
   assert.strictEqual(normalized.href, "https://golrox.com/beli-robux/username");
+});
+
+test("Normalisasi URL: mengalihkan URL Free Fire Max gogogo.com ke katalog Free Fire kanonikal", () => {
+  const input = "https://gogogo.com/id-id/p/topup/free-fire-max-games";
+  const normalized = normalizeStoreUrl(input, { id: "free-fire" });
+  assert.strictEqual(normalized.href, "https://gogogo.com/id-id/p/topup/free-fire-games");
+});
+
+test("Normalisasi URL: URL Free Fire kanonikal gogogo.com tetap mengarah ke free-fire-games", () => {
+  const input = "https://gogogo.com/id-id/p/topup/free-fire-games";
+  const normalized = normalizeStoreUrl(input, { id: "free-fire" });
+  assert.strictEqual(normalized.href, "https://gogogo.com/id-id/p/topup/free-fire-games");
+});
+
+test("Normalisasi URL: menyuntikkan parameter region pada Lootbar Free Fire", () => {
+  const input = "https://lootbar.com/topup/free-fire";
+  const normalized = normalizeStoreUrl(input, { id: "free-fire" });
+  assert.strictEqual(normalized.searchParams.get("region"), "ff_id");
+});
+
+test("Normalisasi URL: membersihkan prefix bahasa/locale pada BangJeff", () => {
+  const input = "https://bangjeff.com/en-id/mobile-legends";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.pathname, "/mobile-legends");
+});
+
+test("Normalisasi URL: Tokopedia dialihkan ke slug voucher-game katalog resmi", () => {
+  const input = "https://www.tokopedia.com/digital/game/top-up-ff";
+  const normalized = normalizeStoreUrl(input, { id: "free-fire" });
+  assert.strictEqual(normalized.href, "https://www.tokopedia.com/digital/voucher-game/free-fire");
+});
+
+test("Known Domain: Toko terdaftar dikenali sebagai domain resmi yang didukung", () => {
+  assert.strictEqual(isKnownDomain("tokopedia.com"), true);
+  assert.strictEqual(isKnownDomain("blibli.com"), true);
+  assert.strictEqual(isKnownDomain("lapakgaming.com"), true);
+  assert.strictEqual(isKnownDomain("gogogo.com"), true);
+  assert.strictEqual(isKnownDomain("casatopup.com"), true);
+  assert.strictEqual(isKnownDomain("toko-asing-palsu.com"), false);
+});
+
+test("Matcher Named Product: variasi teks 'Membership Mingguan' cocok ke Member Mingguan", () => {
+  const p1 = parseNamedProduct("Membership Mingguan");
+  assert.strictEqual(p1?.key, "Member Mingguan");
+  assert.strictEqual(p1?.category, "membership");
+
+  const p2 = parseNamedProduct("Mingguan Membership");
+  assert.strictEqual(p2?.key, "Member Mingguan");
+
+  const p3 = parseNamedProduct("Bulanan Membership");
+  assert.strictEqual(p3?.key, "Member Bulanan");
 });
 
 // =============================================================================

@@ -38,8 +38,8 @@ const {
   extractGenericRows,
   extractProductPairsFromJson,
 } = require("./lib/extractors/generic-extractor");
+const { normalizeStoreUrl } = require("./lib/config/game-config");
 const {
-  normalizeFunnerlifeUrl,
   normalizeMobapayProductName,
   normalizeTokopediaUrl,
   parseBlibliOptionText,
@@ -103,6 +103,8 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
     "bangjeff.com": '[class*="group/variant"]',
     "ourastore.com": '[class*="group/variant"]',
     "lapakgaming.com": '[class*="rounded-xl"], [class*="cursor-pointer"]',
+    "gogogo.com": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
+    "gogogo.id": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
@@ -162,7 +164,7 @@ async function triggerStoreSpecificInteractions(page, url) {
     }
   }
 
-  if (url.hostname.endsWith("gogogo.id") && /roblox/i.test(url.pathname)) {
+  if ((url.hostname.endsWith("gogogo.id") || url.hostname.endsWith("gogogo.com")) && /roblox/i.test(url.pathname)) {
     const globalInstanTab = page.getByText(/Roblox Global Instan/i).first();
     if (await globalInstanTab.count()) {
       await globalInstanTab.click({ force: true }).catch(() => {});
@@ -172,7 +174,7 @@ async function triggerStoreSpecificInteractions(page, url) {
 
   // Handle lazy loading / smooth scroll
   await page.locator(".animate-shimmer, [class*='skeleton']").first().waitFor({ state: "detached", timeout: 8_000 }).catch(() => {});
-  await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+  await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"], div[class*="hover:border-golden-yellow"]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
   await page.waitForTimeout(400);
 
   await page.evaluate(async () => {
@@ -242,20 +244,7 @@ async function detectStoreMaintenance(page, response) {
 }
 
 async function scrape(url, selector, headed, options = {}) {
-  url = url instanceof URL ? url : new URL(url);
-  if (
-    url.hostname.endsWith("lootbar.com") &&
-    url.pathname.includes("free-fire") &&
-    !url.searchParams.has("region")
-  ) {
-    url.searchParams.set("region", "ff_id");
-  }
-  if (url.hostname.endsWith("bangjeff.com")) {
-    const cleanedPath = url.pathname.replace(/^\/(?:en-[a-z]{2}|[a-z]{2}-[a-z]{2}|en|th|my)(?=\/|$)/i, "");
-    if (cleanedPath !== url.pathname) {
-      url.pathname = cleanedPath || "/";
-    }
-  }
+  url = normalizeStoreUrl(url, { id: options.gameId });
   const domain = url.hostname.replace(/^www\./, "");
 
   // 1. Delegasi ke Real Browser jika domain dikonfigurasi fast-track di ENV
@@ -505,7 +494,7 @@ async function scrape(url, selector, headed, options = {}) {
 }
 
 async function main() {
-  const url = normalizeFunnerlifeUrl(normalizeTokopediaUrl(await getUrl()));
+  const url = normalizeStoreUrl(await getUrl());
   const selector = getArgument("selector", DEFAULT_SELECTOR);
   const output = getArgument("output", createOutputName(url));
   const headed = process.argv.includes("--headed");
