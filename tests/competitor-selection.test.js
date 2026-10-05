@@ -94,6 +94,39 @@ async function runAllTests() {
     assert.strictEqual(ranking[1].store, "lapakgaming.com");
   });
 
+  // 2b. Platform donasi / tipping (saweria.co, trakteer.id) otomatis ditolak
+  test("Filter Toko: platform donasi (saweria.co, trakteer.id) tidak masuk ranking", () => {
+    const mockOrganic = [
+      {
+        position: 1,
+        title: "Naellyn - Toko Top Up Mobile Legends Bang Bang",
+        link: "https://saweria.co/Naellyn/toko-top-up/mobile-legends-bang-bang",
+        snippet: "Dukung streamer dan top up diamond",
+      },
+      {
+        position: 2,
+        title: "Trakteer Top Up Diamond MLBB",
+        link: "https://trakteer.id/gamer/tip",
+        snippet: "Beli diamond mobile legends",
+      },
+      {
+        position: 3,
+        title: "Top Up MLBB - Lapakgaming",
+        link: "https://www.lapakgaming.com/id-id/mobile-legends",
+        snippet: "Beli diamond mobile legends termurah",
+      },
+    ];
+
+    const { ranking, decisions } = selectGoogleCompetitors(mockOrganic, mockGameConfig, 5);
+    assert.strictEqual(ranking.length, 2);
+    assert.strictEqual(ranking[0].store, "itemku.com");
+    assert.strictEqual(ranking[1].store, "lapakgaming.com");
+    const saweriaDecision = decisions.find((d) => d.link && d.link.includes("saweria.co"));
+    assert.ok(saweriaDecision);
+    assert.strictEqual(saweriaDecision.eligible, false);
+    assert.ok(["non_store_domain", "editorial_page"].includes(saweriaDecision.classification));
+  });
+
   // 3. searchGoogle dengan multi-page deep pagination
   await test("searchGoogle: melakukan deep-pagination saat halaman 1 kurang toko", async () => {
     const pageCalls = [];
