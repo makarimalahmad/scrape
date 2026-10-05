@@ -205,7 +205,7 @@ async function runAllTests() {
       const start = parsedUrl.searchParams.get("start") || "0";
       queriesCalled.push({ q, start });
 
-      if (q === "top up diamond mlbb") {
+      if (q === "top up diamond mlbb resmi") {
         // Query pertama hanya menghasilkan 1 toko di halaman 1 dan kosong di halaman 2-4
         if (start === "0") {
           return {
@@ -223,7 +223,7 @@ async function runAllTests() {
           };
         }
         return { ok: true, json: async () => ({ organic_results: [] }) };
-      } else if (q === "top up mobile legends") {
+      } else if (q === "top up mlbb murah" || q === "top up mobile legends") {
         // Query kedua menghasilkan toko-toko organik baru
         if (start === "0") {
           return {
@@ -256,8 +256,8 @@ async function runAllTests() {
     });
 
     // Harus mencoba query alternatif saat query pertama kekurangan toko
-    assert.ok(queriesCalled.some((c) => c.q === "top up diamond mlbb"));
-    assert.ok(queriesCalled.some((c) => c.q === "top up mobile legends"));
+    assert.ok(queriesCalled.some((c) => c.q === "top up diamond mlbb resmi"));
+    assert.ok(queriesCalled.some((c) => c.q === "top up mlbb murah" || c.q === "top up mobile legends"));
     // Hasil gabungan unik mencakup itemku + wishgm + codashop + unipin
     assert.strictEqual(ranking.length, 4);
     assert.ok(ranking.some((r) => r.store === "itemku.com"));
