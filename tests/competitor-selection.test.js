@@ -127,21 +127,39 @@ async function runAllTests() {
     assert.ok(["non_store_domain", "editorial_page"].includes(saweriaDecision.classification));
   });
 
+  // Helper parsing request mockFetch (mendukung format query URL maupun payload POST Serper)
+  function extractSearchParams(url, init) {
+    if (typeof url === "string" && url.includes("?")) {
+      const parsedUrl = new URL(url);
+      const start = parsedUrl.searchParams.get("start") || "0";
+      return {
+        q: parsedUrl.searchParams.get("q") || "",
+        start,
+        page: parsedUrl.searchParams.get("page") || (start === "0" ? "1" : "2"),
+      };
+    }
+    if (init && init.body) {
+      const b = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
+      const page = String(b.page || 1);
+      const start = String((Number(page) - 1) * 10);
+      return { q: b.q || "", start, page };
+    }
+    return { q: "", start: "0", page: "1" };
+  }
+
   // 3. searchGoogle dengan multi-page deep pagination
   await test("searchGoogle: melakukan deep-pagination saat halaman 1 kurang toko", async () => {
     const pageCalls = [];
-    const mockFetch = async (url) => {
-      const parsedUrl = new URL(url);
-      const start = parsedUrl.searchParams.get("start") || "0";
-      const q = parsedUrl.searchParams.get("q") || "";
-      pageCalls.push({ q, start });
+    const mockFetch = async (url, init) => {
+      const { q, start, page } = extractSearchParams(url, init);
+      pageCalls.push({ q, start, page });
 
-      if (start === "0") {
+      if (start === "0" || page === "1") {
         // Halaman 1 hanya menemukan 1 toko kompetitor
         return {
           ok: true,
           json: async () => ({
-            organic_results: [
+            organic: [
               {
                 position: 1,
                 title: "Wishgm Top Up ML",
@@ -151,12 +169,12 @@ async function runAllTests() {
             ],
           }),
         };
-      } else if (start === "10") {
+      } else if (start === "10" || page === "2") {
         // Halaman 2 menemukan toko-toko lain di posisi organik 11 dan 12
         return {
           ok: true,
           json: async () => ({
-            organic_results: [
+            organic: [
               {
                 position: 11,
                 title: "Top Up MLBB - Lapakgaming",
@@ -173,16 +191,14 @@ async function runAllTests() {
           }),
         };
       }
-      return { ok: true, json: async () => ({ organic_results: [] }) };
+      return { ok: true, json: async () => ({ organic: [] }) };
     };
 
-    const { ranking } = await searchGoogle("fake-api-key", mockGameConfig, 4, mockFetch, {
-      provider: "serpapi",
-    });
+    const { ranking } = await searchGoogle("fake-api-key", mockGameConfig, 4, mockFetch);
 
     // Harus memanggil halaman start=0 dan start=10 secara bertahap
-    assert.ok(pageCalls.some((c) => c.start === "0"));
-    assert.ok(pageCalls.some((c) => c.start === "10"));
+    assert.ok(pageCalls.some((c) => c.start === "0" || c.page === "1"));
+    assert.ok(pageCalls.some((c) => c.start === "10" || c.page === "2"));
     // Hasil akumulasi toko harus memuat itemku + wishgm + lapakgaming + codashop
     assert.strictEqual(ranking.length, 4);
     assert.ok(ranking.some((r) => r.store === "itemku.com"));
@@ -199,19 +215,17 @@ async function runAllTests() {
   // 4. searchGoogle dengan multi-query expansion organik
   await test("searchGoogle: mencoba query komersial alternatif jika query utama habis", async () => {
     const queriesCalled = [];
-    const mockFetch = async (url) => {
-      const parsedUrl = new URL(url);
-      const q = parsedUrl.searchParams.get("q") || "";
-      const start = parsedUrl.searchParams.get("start") || "0";
-      queriesCalled.push({ q, start });
+    const mockFetch = async (url, init) => {
+      const { q, start, page } = extractSearchParams(url, init);
+      queriesCalled.push({ q, start, page });
 
       if (q === "top up diamond mlbb resmi") {
         // Query pertama hanya menghasilkan 1 toko di halaman 1 dan kosong di halaman 2-4
-        if (start === "0") {
+        if (start === "0" || page === "1") {
           return {
             ok: true,
             json: async () => ({
-              organic_results: [
+              organic: [
                 {
                   position: 6,
                   title: "Wishgm Top Up ML",
@@ -222,14 +236,14 @@ async function runAllTests() {
             }),
           };
         }
-        return { ok: true, json: async () => ({ organic_results: [] }) };
+        return { ok: true, json: async () => ({ organic: [] }) };
       } else if (q === "top up mlbb murah" || q === "top up mobile legends") {
         // Query kedua menghasilkan toko-toko organik baru
-        if (start === "0") {
+        if (start === "0" || page === "1") {
           return {
             ok: true,
             json: async () => ({
-              organic_results: [
+              organic: [
                 {
                   position: 2,
                   title: "Codashop Mobile Legends",
@@ -246,14 +260,12 @@ async function runAllTests() {
             }),
           };
         }
-        return { ok: true, json: async () => ({ organic_results: [] }) };
+        return { ok: true, json: async () => ({ organic: [] }) };
       }
-      return { ok: true, json: async () => ({ organic_results: [] }) };
+      return { ok: true, json: async () => ({ organic: [] }) };
     };
 
-    const { ranking } = await searchGoogle("fake-api-key", mockGameConfig, 4, mockFetch, {
-      provider: "serpapi",
-    });
+    const { ranking } = await searchGoogle("fake-api-key", mockGameConfig, 4, mockFetch);
 
     // Harus mencoba query alternatif saat query pertama kekurangan toko
     assert.ok(queriesCalled.some((c) => c.q === "top up diamond mlbb resmi"));
@@ -271,7 +283,7 @@ async function runAllTests() {
     const mockFetch = async () => ({
       ok: true,
       json: async () => ({
-        organic_results: [
+        organic: [
           {
             position: 6,
             title: "Wishgm Top Up ML",
@@ -286,8 +298,7 @@ async function runAllTests() {
       "fake-api-key",
       mockGameConfig,
       10,
-      mockFetch,
-      { provider: "serpapi" }
+      mockFetch
     );
 
     // Tanpa hardcode, jika Google hanya menghasilkan wishgm, maka hanya wishgm + priority store yang diambil

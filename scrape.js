@@ -126,7 +126,7 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
       () => {
         const text = document.body?.innerText || "";
         const challengeVisible =
-          /sorry, you have been blocked|attention required|access denied|captcha|cloudflare ray id|melakukan verifikasi keamanan|verifikasi bahwa anda/i.test(
+          /sorry, you have been blocked|attention required|access denied|captcha|cloudflare|performing security verification|verifies you are not a bot|malicious bots|verifikasi keamanan|verifikasi bahwa anda|just a moment|\bray id:/i.test(
             text,
           );
         const hasPrice = /(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d/i.test(text);
@@ -235,6 +235,20 @@ async function detectStoreMaintenance(page, response) {
         const text = (el.innerText || el.textContent || "").trim();
         if (text && maintenancePatterns.some((pattern) => pattern.test(text))) {
           return text.replace(/\s+/g, " ").slice(0, 120);
+        }
+      }
+
+      // 3. Cek paragraf / teks utama body halaman jika produk kosong
+      const bodySnippet = (document.body?.innerText || "").slice(0, 3000);
+      for (const pattern of maintenancePatterns) {
+        const match = bodySnippet.match(pattern);
+        if (match) {
+          const lines = bodySnippet.split("\n").map(l => l.trim()).filter(Boolean);
+          const matchedLine = lines.find(l => pattern.test(l));
+          if (matchedLine) return matchedLine.slice(0, 120);
+          const start = Math.max(0, match.index - 25);
+          const end = Math.min(bodySnippet.length, match.index + match[0].length + 45);
+          return bodySnippet.slice(start, end).replace(/\s+/g, " ").trim();
         }
       }
 

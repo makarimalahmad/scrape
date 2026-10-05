@@ -140,7 +140,7 @@ function createPairRows(gameConfig, mainStore, competitor) {
 }
 
 /**
- * Compare prices directly between 2 specific URLs without using Google SerpAPI.
+ * Compare prices directly between 2 specific URLs without using Google search.
  * @param {string} mainUrl - Main reference store URL
  * @param {string} competitorUrl - Competitor store URL
  * @param {Object} [options]
@@ -217,7 +217,7 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * Perform a full Google search and competitive price comparison for a supported game.
  * @param {string} gameId - "mobile-legends" | "free-fire" | "roblox"
  * @param {Object} [options]
- * @param {string} [options.apiKey] - SerpAPI Key (defaults to process.env.SERPAPI_KEY)
+ * @param {string} [options.apiKey] - Serper API Key (defaults to process.env.SERPER_API_KEY)
  * @param {number} [options.limit=10] - Number of top Google organic competitors to scrape
  * @param {number} [options.concurrency=3] - Parallel browser tabs
  * @param {number} [options.maxAttempts=3] - Retry attempts per store
@@ -228,17 +228,9 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
  * @returns {Promise<Object>} Structured comparison data with anchors and store pricing
  */
 async function compareGame(gameId, options = {}) {
-  let provider = (options.provider || process.env.SERP_PROVIDER || (process.env.BRIGHTDATA_API_KEY && !process.env.SERPAPI_KEY ? "brightdata" : "serpapi")).toLowerCase();
-  if (provider === "brightdata" && !process.env.BRIGHTDATA_API_KEY && (options.apiKey || process.env.SERPAPI_KEY)) {
-    provider = "serpapi";
-    process.env.SERP_PROVIDER = "serpapi";
-  } else if (provider === "serpapi" && !options.apiKey && !process.env.SERPAPI_KEY && process.env.BRIGHTDATA_API_KEY) {
-    provider = "brightdata";
-    process.env.SERP_PROVIDER = "brightdata";
-  }
-  const apiKey = options.apiKey || (provider === "brightdata" ? (process.env.BRIGHTDATA_API_KEY || process.env.SERPAPI_KEY) : (process.env.SERPAPI_KEY || process.env.BRIGHTDATA_API_KEY));
+  const apiKey = options.apiKey || process.env.SERPER_API_KEY;
   if (!apiKey) {
-    throw new Error("Setidaknya salah satu kunci (BRIGHTDATA_API_KEY atau SERPAPI_KEY) harus diatur.");
+    throw new Error("SERPER_API_KEY belum diatur di file .env atau options.apiKey.");
   }
 
   const gameConfig = GAME_CONFIGS.find(
@@ -448,7 +440,7 @@ module.exports = {
   // Validation Engines
   validateScrapeResults,
 
-  // SerpAPI & Google Ranking
+  // Google Search & Ranking
   searchGoogle,
   selectGoogleCompetitors,
   classifyTopUpCompetitorResult,

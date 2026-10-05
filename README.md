@@ -39,15 +39,8 @@ npx playwright install chromium
 Duplikat file `.env.example` menjadi `.env` di folder utama, sesuaikan konfigurasi berikut:
 
 ```env
-# Provider pencarian Google ('brightdata' atau 'serpapi')
-SERP_PROVIDER=brightdata
-
-# Bright Data SERP API
-BRIGHTDATA_API_KEY=ISI_TOKEN_BRIGHTDATA
-BRIGHTDATA_ZONE=serp_api
-
-# SerpApi (Opsional: Digunakan otomatis jika Bright Data tidak diatur)
-# SERPAPI_KEY=ISI_KEY_SERPAPI
+# Google Search API (Serper.dev)
+SERPER_API_KEY=ISI_KEY_SERPER
 
 # ==============================================================================
 # PENGATURAN OPSIONAL
