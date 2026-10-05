@@ -11,28 +11,10 @@ const {
 } = require("./lib/anti-bot/cloudflare");
 const {
   getRealBrowserDomains,
-  REAL_BROWSER_DOMAINS,
   scrapeWithRealBrowser,
 } = require("./lib/anti-bot/real-browser");
 const {
   extractSpecialRows,
-  extractBlibliRows,
-  extractDanaRows,
-  extractDitusiRows,
-  extractDuniaGamesRows,
-  extractEbelanjaRows,
-  extractGopayRows,
-  extractHiddengameRows,
-  extractKiosgamerRows,
-  extractMobapayRows,
-  extractRobloxRows,
-  extractShopeeRows,
-  extractTokopediaRows,
-  extractUniPinRows,
-  extractUnipinRobloxRows,
-  extractUPointRows,
-  extractVcgamersRows,
-  extractVexagameRows,
 } = require("./lib/extractors/special-extractors");
 const {
   extractGenericRows,
