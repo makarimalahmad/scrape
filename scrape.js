@@ -412,6 +412,7 @@ async function scrape(url, selector, headed, options = {}) {
           : `[Cloudflare] ${domain} verifikasi tidak selesai dalam batas waktu setelah ${challenge.clickCount} klik otomatis. Situs dilewati.`;
         const error = new Error(message);
         error.retryable = false;
+        error.usedProxy = usedProxy;
         throw error;
       }
 
