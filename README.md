@@ -1,8 +1,8 @@
 # Price Scraper & Comparison
 
-Otomatisasi untuk memantau dan membandingkan harga voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**).
+Scraper untuk memantau dan membandingkan harga voucher game (**Mobile Legends**, **Free Fire**, dan **Roblox**).
 
-Sistem ini secara otomatis menelusuri toko kompetitor teratas di Google Indonesia, mengambil harga terkini dari masing-masing situs, menyetarakan nama produk, lalu menyusun laporan perbandingan harga antara toko utama (**UPoint** dan **DuniaGames**) dengan toko kompetitor ke dalam format **Excel (.xlsx)** dan **CSV**.
+Script ini mencari kompetitor teratas di Google Indonesia (Serper API), mengambil harga produk, menstandarkan nama item, lalu membuat laporan perbandingan harga antara toko utama (**UPoint** dan **DuniaGames**) dengan kompetitor dalam format **Excel (.xlsx)** dan **CSV**.
 
 ---
 
@@ -16,40 +16,32 @@ Sistem ini secara otomatis menelusuri toko kompetitor teratas di Google Indonesi
 
 ---
 
-## Panduan Instalasi
+## Instalasi
 
-Pastikan server atau komputer sudah terpasang **Node.js (versi 18+)**.
+Kebutuhan: **Node.js 18+**.
 
 ```bash
-# 1. Pasang dependensi proyek
+# Pasang dependensi dan browser Chromium
 npm install
-
-# 2. Pasang browser Chromium (Playwright)
 npx playwright install chromium
 ```
 
-> **Untuk Linux (Ubuntu/Debian):**  
-> Jika server tidak memiliki tampilan antarmuka visual (GUI), jalankan perintah pendukung berikut:  
-> `npx playwright install-deps chromium`
-
 ---
 
-## Konfigurasi Environment (`.env`)
+## Konfigurasi (`.env`)
 
-Duplikat file `.env.example` menjadi `.env` di folder utama, sesuaikan konfigurasi berikut:
+Salin `.env.example` menjadi `.env` di folder utama, lalu isi konfigurasi:
 
 ```env
 # Google Search API (Serper.dev)
 SERPER_API_KEY=ISI_KEY_SERPER
 
-# ==============================================================================
-# PENGATURAN OPSIONAL
-# ==============================================================================
-SCRAPER_LIMIT=10            # Jumlah toko kompetitor yang diambil (Default: 10, batas 1 - 10)
-SCRAPER_CONCURRENCY=3       # Jumlah tab browser berjalan paralel (Default: 3, batas 1 - 4)
-SCRAPER_MAX_ATTEMPTS=3     # Batas percobaan ulang jika toko lambat dimuat (Default: 3, batas 1 - 5)
+# Pengaturan Opsional
+SCRAPER_LIMIT=10            # Jumlah kompetitor yang diambil (Default: 10, batas 1 - 10)
+SCRAPER_CONCURRENCY=3       # Tab browser paralel (Default: 3, batas 1 - 4)
+SCRAPER_MAX_ATTEMPTS=3     # Batas coba ulang saat halaman lambat (Default: 3, batas 1 - 5)
 
-# Proxy (Hanya diperlukan jika ada toko yang membatasi IP server)
+# Proxy (Diperlukan jika toko memblokir IP server)
 # PROXY_URL=http://username:password@host:port
 # PROXY_DOMAINS=bangjeff.com
 ```
@@ -58,13 +50,13 @@ SCRAPER_MAX_ATTEMPTS=3     # Batas percobaan ulang jika toko lambat dimuat (Defa
 
 ## Cara Menjalankan
 
-### 1. Menjalankan Seluruh Game Sekaligus
+### 1. Semua Game Sekaligus
 
 ```bash
 node compare-game.js --game all
 ```
 
-### 2. Menjalankan Game Tertentu
+### 2. Game Tertentu
 
 ```bash
 # Mobile Legends
@@ -77,14 +69,14 @@ node compare-game.js --game free-fire
 node compare-game.js --game roblox
 ```
 
-### 3. Opsi Tambahan (Flags)
+### 3. Opsi Flags
 
-- `--limit <jumlah>`: Membatasi jumlah kompetitor Google (contoh: `node compare-game.js --game mobile-legends --limit 5`).
-- `--headed`: Membuka jendela browser secara visual (untuk pengecekan langsung di komputer lokal).
+- `--limit <jumlah>`: Batasi jumlah kompetitor Google (contoh: `node compare-game.js --game mobile-legends --limit 5`).
+- `--headed`: Buka jendela browser secara visual (untuk debug lokal).
 
-### 4. Eksekusi Otomatis Harian di VPS
+### 4. Eksekusi Otomatis Harian di Server
 
-Proyek ini dilengkapi dengan skrip runner untuk jadwal harian (_cron job_):
+Runner untuk cron job harian di server:
 
 ```bash
 ./scrape-daily.sh
@@ -92,9 +84,9 @@ Proyek ini dilengkapi dengan skrip runner untuk jadwal harian (_cron job_):
 
 ---
 
-## Format Laporan Hasil Output
+## Output
 
-Setiap proses komparasi akan membuat folder baru berdasarkan tanggal di dalam direktori `output/`:
+Setiap proses komparasi membuat folder baru berdasarkan tanggal di dalam `output/`:
 
 ```text
 output/YYYY-MM-DD/
@@ -106,55 +98,56 @@ output/YYYY-MM-DD/
 │   │   └── scrape-free-fire.xlsx
 │   ├── roblox/
 │   │   └── scrape-roblox.xlsx
-│   └── summary-scrape.json              # Ringkasan status scraping semua game (JSON)
-└── scrapes/                             # Data mentah CSV per masing-masing toko
+│   └── summary-scrape.json              # Ringkasan status scraping (JSON)
+└── scrapes/                             # Data mentah CSV per toko
 ```
 
-### Fitur Laporan Excel (.xlsx):
+### Format Excel (.xlsx):
 
-- **Tabel Perbandingan Lengkap**: Menampilkan perbandingan harga dari Toko Utama dengan seluruh Toko Kompetitor.
-- **Penanda Warna Visual**:
-  - 🟩 **Hijau**: Harga termurah di pasar untuk produk tersebut.
-  - 🟥 **Merah**: Harga tertinggi di pasar untuk produk tersebut.
-- **Analisis Selisih Harga**: Menghitung secara otomatis selisih nominal (Rp) dan selisih persentase (%) terhadap harga toko utama.
+- **Tabel Perbandingan**: Harga toko utama vs semua kompetitor per produk.
+- **Warna**:
+  - 🟩 **Hijau**: Harga termurah.
+  - 🟥 **Merah**: Harga termahal.
+- **Selisih**: Nominal (Rp) dan persentase (%) terhadap harga toko utama.
 
 ---
 
-## Penyesuaian Pajak & Biaya Toko (Dictionary PPN)
+## Penyesuaian Pajak & Biaya (`calculateTax`)
 
-Secara default, scraper mengambil harga asli yang tertera pada situs masing-masing toko. Jika ingin harga kompetitor disesuaikan dengan estimasi PPN (misal 11%) atau biaya transaksi (seperti QRIS 0.7%), SDK menyediakan opsi `calculateTax`:
+Default: scraper mengambil harga asli yang tertera di situs toko.
+
+Jika harga kompetitor perlu disesuaikan dengan PPN (misal 11%) atau biaya transaksi (QRIS 0.7%), gunakan opsi `calculateTax`:
 
 ```javascript
 const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
 const result = await compareGame("mobile-legends", {
   calculateTax: {
-    // 1. Penyesuaian persentase per domain toko:
-    "unipin.com": 11, // Menambahkan PPN 11% (format angka)
-    "itemku.com": "0.7%", // Menambahkan biaya QRIS 0.7% (format string %)
+    // Persentase per domain toko:
+    "unipin.com": 11, // PPN 11% (angka)
+    "itemku.com": "0.7%", // QRIS 0.7% (string %)
     "ditusi.co.id": 12.11, // PPN 11% + QRIS 1.11%
 
-    // 2. Penyesuaian khusus per game dalam satu domain:
+    // Khusus per game dalam satu domain:
     "codashop.com": {
-      "mobile-legends": 11, // PPN 11% khusus MLBB
-      "free-fire": 11, // PPN 11% khusus Free Fire
-      roblox: 0, // Tanpa penyesuaian untuk Roblox
+      "mobile-legends": 11,
+      "free-fire": 11,
+      roblox: 0,
     },
   },
 });
 ```
 
-**NOTE:**
-
-- Domain toko yang tidak didaftarkan pada dictionary akan tetap menggunakan harga asli tanpa perubahan.
-- Format bisa menggunakan string persen ("11%", "0.7%"), string angka ("11", "0.7"), maupun angka murni (11, 0.7).
-- Nama domain dicocokkan secara otomatis (tidak terpengaruh awalan `www.` atau huruf besar/kecil).
+Catatan:
+- Domain yang tidak terdaftar di dictionary tetap memakai harga asli.
+- Format nilai menerima string persen (`"11%"`, `"0.7%"`), string angka (`"11"`), atau angka murni (`11`).
+- Domain dicocokkan otomatis (tidak terpengaruh awalan `www.` atau huruf besar/kecil).
 
 ---
 
-## Pengujian Kualitas Kode
+## Pengujian
 
-Untuk memastikan seluruh modul penyesuaian nama produk, aturan pajak, dan fungsi pencarian berjalan normal:
+Jalankan test suite:
 
 ```bash
 npm test
