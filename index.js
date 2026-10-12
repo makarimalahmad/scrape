@@ -65,7 +65,8 @@ async function scrapeUrl(url, options = {}) {
     const domain = extractDomain(hostname, url);
     const calculateTax = options.calculateTax;
 
-    const products = rawRows.map((r) => {
+    const products = [];
+    for (const r of rawRows) {
       let numPrice = Number(String(r.Harga || "").replace(/[^\d]/g, "")) || 0;
       let displayPrice = r.Harga;
       if (calculateTax) {
@@ -83,12 +84,12 @@ async function scrapeUrl(url, options = {}) {
           displayPrice = `Rp ${numPrice.toLocaleString("id-ID")}`;
         }
       }
-      return {
+      products.push({
         name: r.Produk,
         price: displayPrice,
         rawPrice: numPrice,
-      };
-    });
+      });
+    }
 
     let csvPath = null;
     if (options.exportCsvPath && rawRows.length > 0) {
@@ -160,26 +161,28 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
   const mainHostname = new URL(mainUrl).hostname;
   const competitorHostname = new URL(competitorUrl).hostname;
 
-  const mainParsed = selectCheapestProducts(
-    mainResult.products.map((p) => ({ Produk: p.name, Harga: p.price })),
-    game,
-    {
-      hostname: mainHostname,
-      url: mainUrl,
-      store: mainHostname.replace(/^www\./, ""),
-      calculateTax: options.calculateTax,
-    },
-  );
-  const competitorParsed = selectCheapestProducts(
-    competitorResult.products.map((p) => ({ Produk: p.name, Harga: p.price })),
-    game,
-    {
-      hostname: competitorHostname,
-      url: competitorUrl,
-      store: competitorHostname.replace(/^www\./, ""),
-      calculateTax: options.calculateTax,
-    },
-  );
+  const mainProductRows = [];
+  for (const p of mainResult.products) {
+    mainProductRows.push({ Produk: p.name, Harga: p.price });
+  }
+
+  const competitorProductRows = [];
+  for (const p of competitorResult.products) {
+    competitorProductRows.push({ Produk: p.name, Harga: p.price });
+  }
+
+  const mainParsed = selectCheapestProducts(mainProductRows, game, {
+    hostname: mainHostname,
+    url: mainUrl,
+    store: mainHostname.replace(/^www\./, ""),
+    calculateTax: options.calculateTax,
+  });
+  const competitorParsed = selectCheapestProducts(competitorProductRows, game, {
+    hostname: competitorHostname,
+    url: competitorUrl,
+    store: competitorHostname.replace(/^www\./, ""),
+    calculateTax: options.calculateTax,
+  });
 
   const mainStore = {
     name: mainHostname.replace(/^www\./, ""),
@@ -233,9 +236,14 @@ async function compareGame(gameId, options = {}) {
     throw new Error("SERPER_API_KEY belum diatur di file .env atau options.apiKey.");
   }
 
-  const gameConfig = GAME_CONFIGS.find(
-    (g) => g.id.toLowerCase() === String(gameId).trim().toLowerCase(),
-  );
+  let gameConfig = null;
+  const targetGameId = String(gameId).trim().toLowerCase();
+  for (const g of GAME_CONFIGS) {
+    if (g.id.toLowerCase() === targetGameId) {
+      gameConfig = g;
+      break;
+    }
+  }
   if (!gameConfig) {
     throw new Error(
       `Game ID '${gameId}' tidak valid. Pilih: mobile-legends, free-fire, atau roblox.`,
@@ -318,12 +326,21 @@ async function compareGame(gameId, options = {}) {
   const isStoreSuccess = (s) =>
     Boolean(s && !s.error && s.products && s.products.size > 0);
 
-  const mainStoreResults = allStores.filter(
-    (s) => isStoreSuccess(s) && gameConfig.mainStores.some((m) => m.name === s.name),
-  );
-  const competitorStoreResults = allStores.filter(
-    (s) => isStoreSuccess(s) && !gameConfig.mainStores.some((m) => m.name === s.name),
-  );
+  const mainStoreNames = new Set();
+  for (const m of gameConfig.mainStores) {
+    mainStoreNames.add(m.name);
+  }
+
+  const mainStoreResults = [];
+  const competitorStoreResults = [];
+  for (const s of allStores) {
+    if (!isStoreSuccess(s)) continue;
+    if (mainStoreNames.has(s.name)) {
+      mainStoreResults.push(s);
+    } else {
+      competitorStoreResults.push(s);
+    }
+  }
 
   const comparisonRows = createScrapeRows(
     gameConfig,

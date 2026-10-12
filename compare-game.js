@@ -64,12 +64,7 @@ function createProductAnchors(mainStores) {
   });
 }
 
-// ============================================================================
-// PERHITUNGAN 1: Menentukan Harga Pembanding (Benchmark) Terendah & Tertinggi
-// ============================================================================
-// Fungsi ini mengurutkan seluruh toko kompetitor berdasarkan harga produk:
-// - "lowest"  : mencari toko dengan harga paling murah (terendah) di pasar.
-// - "highest" : mencari toko dengan harga paling mahal (tertinggi) di pasar.
+// Tentukan harga pembanding (benchmark) kompetitor: terendah (lowest) atau tertinggi (highest)
 function selectBenchmark(entries, direction) {
   if (!entries.length) return null;
   return [...entries].sort((first, second) => {
@@ -84,16 +79,7 @@ function selectBenchmark(entries, direction) {
   })[0];
 }
 
-// ============================================================================
-// PERHITUNGAN 2: Menghitung Selisih Rupiah & Persentase (%)
-// ============================================================================
-// Rumus yang digunakan:
-// 1. Selisih (Nominal) = Harga Toko Utama (UPoint / DuniaGames) - Harga Benchmark (Terendah / Tertinggi)
-//    - Jika Positif (+) : Toko utama lebih mahal dibanding harga benchmark.
-//    - Jika Negatif (-) : Toko utama lebih murah dibanding harga benchmark.
-//
-// 2. Persentase (%)   = (Selisih / Harga Toko Utama) * 100
-//    - Contoh: Selisih Rp 75 pada harga Rp 960 -> (75 / 960) * 100 = 7.8125%
+// Hitung selisih nominal dan persentase harga toko utama terhadap benchmark kompetitor
 function calculateComparison(mainProduct, benchmark) {
   if (!mainProduct || !benchmark) return { difference: "-", percentage: "-" };
   const difference = mainProduct.price - benchmark.product.price;
@@ -266,9 +252,7 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
   ]) {
     worksheet.getColumn(column).numFmt = rupiahFormat;
   }
-  // ============================================================================
-  // FORMATTING EXCEL: Menampilkan Kolom Persen dengan 4 Angka Desimal (0.0000%)
-  // ============================================================================
+  // Format kolom persentase dengan 4 angka desimal (0.0000%)
   worksheet.getColumn(lowestStart + 2).numFmt = "0.0000%";
   worksheet.getColumn(lowestStart + 5).numFmt = "0.0000%";
   worksheet.getColumn(highestStart + 2).numFmt = "0.0000%";
@@ -302,25 +286,23 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
     }
   }
 
-  // ============================================================================
-  // HIGHLIGHT WARNA: Hijau Muda (Harga Termurah) & Merah Muda (Harga Termahal)
-  // ============================================================================
+  // Highlight warna: hijau muda untuk harga termurah dan merah muda untuk harga termahal
   const lowestFill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FFE2F0D9" }, // Soft Pastel Green
+    fgColor: { argb: "FFE2F0D9" },
   };
   const highestFill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FFFCE4D6" }, // Soft Pastel Peach/Red
+    fgColor: { argb: "FFFCE4D6" },
   };
   const lowestFont = {
-    color: { argb: "FF385723" }, // Teks Hijau Tua
+    color: { argb: "FF385723" },
     bold: true,
   };
   const highestFont = {
-    color: { argb: "FFC00000" }, // Teks Merah Tua
+    color: { argb: "FFC00000" },
     bold: true,
   };
 
@@ -351,9 +333,7 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
     }
   }
 
-  // ============================================================================
-  // KETERANGAN / LEGENDA WARNA
-  // ============================================================================
+  // Keterangan / legenda warna di baris bawah lembar kerja
   const legendRowIdx = worksheet.rowCount + 2;
   const legendLabelCell = worksheet.getCell(legendRowIdx, 1);
   legendLabelCell.value = "Keterangan Warna:";
@@ -473,8 +453,6 @@ async function processGame(apiKey, gameConfig, options) {
     options.concurrency,
     (store) => collectStore(store, gameConfig, options),
   );
-  const mainStores = mainResults.filter((result) => result.success).map((result) => result.store);
-  const competitors = competitorResults.filter((result) => result.success).map((result) => result.store);
   function cleanErrorMessage(rawError) {
     if (!rawError) return null;
     return String(rawError)
@@ -484,24 +462,39 @@ async function processGame(apiKey, gameConfig, options) {
       .trim();
   }
 
-  const failedMainStores = mainResults
-    .filter((result) => !result.success)
-    .map((result) => ({
-      name: result.source.name,
-      url: result.source.url,
-      error: cleanErrorMessage(result.error?.message || result.error),
-      usedProxy: Boolean(result.error?.usedProxy),
-    }));
-  const failedCompetitors = competitorResults
-    .filter((result) => !result.success)
-    .map((result) => ({
-      position: result.source.position,
-      organicPosition: result.source.organicPosition ?? null,
-      name: result.source.store,
-      url: result.source.link,
-      error: cleanErrorMessage(result.error?.message || result.error),
-      usedProxy: Boolean(result.error?.usedProxy),
-    }));
+  // Pisahkan toko utama yang berhasil dan yang gagal
+  const mainStores = [];
+  const failedMainStores = [];
+  for (const result of mainResults) {
+    if (result.success) {
+      mainStores.push(result.store);
+    } else {
+      failedMainStores.push({
+        name: result.source.name,
+        url: result.source.url,
+        error: cleanErrorMessage(result.error?.message || result.error),
+        usedProxy: Boolean(result.error?.usedProxy),
+      });
+    }
+  }
+
+  // Pisahkan toko kompetitor yang berhasil dan yang gagal
+  const competitors = [];
+  const failedCompetitors = [];
+  for (const result of competitorResults) {
+    if (result.success) {
+      competitors.push(result.store);
+    } else {
+      failedCompetitors.push({
+        position: result.source.position,
+        organicPosition: result.source.organicPosition ?? null,
+        name: result.source.store,
+        url: result.source.link,
+        error: cleanErrorMessage(result.error?.message || result.error),
+        usedProxy: Boolean(result.error?.usedProxy),
+      });
+    }
+  }
 
   if (!mainStores.length) throw new Error(`Semua situs utama ${gameConfig.name} gagal.`);
   if (!competitors.length) throw new Error(`Semua kompetitor ${gameConfig.name} gagal.`);
@@ -593,15 +586,19 @@ async function main() {
   if (!gameId) {
     throw new Error("Pilih --game all, mobile-legends, free-fire, atau roblox.");
   }
-  const selectedGames = gameId === "all"
-    ? GAME_CONFIGS
-    : GAME_CONFIGS.filter((game) =>
-        gameId
-          .split(",")
-          .map((id) => id.trim().toLowerCase())
-          .includes(game.id),
-      );
-  if (!selectedGames.length) {
+  const selectedGames = [];
+  if (gameId === "all") {
+    selectedGames.push(...GAME_CONFIGS);
+  } else {
+    const targetIds = gameId.split(",").map((id) => id.trim().toLowerCase());
+    for (const game of GAME_CONFIGS) {
+      if (targetIds.includes(game.id)) {
+        selectedGames.push(game);
+      }
+    }
+  }
+
+  if (selectedGames.length === 0) {
     throw new Error(
       `Game tidak valid: ${gameId}. Pilih all, mobile-legends, free-fire, roblox, atau kombinasi koma (contoh: free-fire,roblox).`,
     );

@@ -49,11 +49,15 @@ function getArgument(name, fallback) {
   return nextValue;
 }
 
+// Ambil URL target dari argumen CLI atau minta input dari pengguna
 async function getUrl() {
-  const argumentUrl = process.argv
-    .slice(2)
-    .find((value) => !value.startsWith("--"));
-  if (argumentUrl) return argumentUrl;
+  // Cek apakah ada argumen URL yang diberikan langsung di baris perintah
+  for (let i = 2; i < process.argv.length; i += 1) {
+    const arg = process.argv[i];
+    if (!arg.startsWith("--")) {
+      return arg;
+    }
+  }
 
   const input = readline.createInterface({
     input: process.stdin,
@@ -225,9 +229,13 @@ async function detectStoreMaintenance(page, response) {
       for (const pattern of maintenancePatterns) {
         const match = bodySnippet.match(pattern);
         if (match) {
-          const lines = bodySnippet.split("\n").map(l => l.trim()).filter(Boolean);
-          const matchedLine = lines.find(l => pattern.test(l));
-          if (matchedLine) return matchedLine.slice(0, 120);
+          const barisTeks = bodySnippet.split("\n");
+          for (const rawLine of barisTeks) {
+            const l = rawLine.trim();
+            if (l && pattern.test(l)) {
+              return l.slice(0, 120);
+            }
+          }
           const start = Math.max(0, match.index - 25);
           const end = Math.min(bodySnippet.length, match.index + match[0].length + 45);
           return bodySnippet.slice(start, end).replace(/\s+/g, " ").trim();
@@ -424,17 +432,18 @@ async function scrape(url, selector, headed, options = {}) {
     // 4. Interaksi Khusus & Ekstraksi Produk
     await triggerStoreSpecificInteractions(page, url);
 
-    let specialRows = await extractSpecialRows(page, url, interceptedPayloads);
-    if (!specialRows?.length) specialRows = null;
+    // Coba ekstraksi khusus untuk toko yang memiliki struktur DOM unik
+    let rows = await extractSpecialRows(page, url, interceptedPayloads);
 
-    let genericRows = null;
-    if (!specialRows) {
-      genericRows = await extractGenericRows(page, url, selector);
+    // Jika toko tidak memiliki ekstraktor khusus atau datanya kosong, gunakan ekstraktor umum
+    if (!rows || rows.length === 0) {
+      rows = await extractGenericRows(page, url, selector);
+    }
+    if (!rows) {
+      rows = [];
     }
 
-    let rows = specialRows ?? genericRows ?? [];
-
-    if (!rows.length) {
+    if (rows.length === 0) {
       const maintenance = await detectStoreMaintenance(page, response);
       if (maintenance) {
         const error = new Error(`[Maintenance] Akses ke ${domain} dilewati: ${maintenance}`);
@@ -445,14 +454,14 @@ async function scrape(url, selector, headed, options = {}) {
       throw new Error("Data harga tidak ditemukan pada halaman ini.");
     }
 
-    const finalRows = rows.map((row, index) => {
-      const cleanRow = { ...row };
-      return {
-        No: index + 1,
-        ...cleanRow,
+    const finalRows = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      finalRows.push({
+        No: i + 1,
+        ...rows[i],
         Sumber: url.href,
-      };
-    });
+      });
+    }
     Object.defineProperty(finalRows, "_usedProxy", {
       value: usedProxy,
       enumerable: false,
