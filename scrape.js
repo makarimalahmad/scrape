@@ -509,7 +509,7 @@ async function main() {
   const validation = validateScrapeResults(url.href, rows);
 
   console.table(rows);
-  console.log(`Confidence data: ${validation.confidence}/100.`);
+  console.log(`Status data: ${validation.status} (${validation.validCount ?? rows.length} produk valid).`);
 
   if (!validation.valid) {
     const reportPath = saveInvalidReport(output, url, validation, rows);
