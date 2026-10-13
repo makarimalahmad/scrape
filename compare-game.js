@@ -499,7 +499,15 @@ async function processGame(apiKey, gameConfig, options) {
   if (!mainStores.length) throw new Error(`Semua situs utama ${gameConfig.name} gagal.`);
   if (!competitors.length) throw new Error(`Semua kompetitor ${gameConfig.name} gagal.`);
 
-  const rows = createScrapeRows(gameConfig, ranking, mainStores, competitors);
+  // Hanya masukkan toko kompetitor yang berhasil discrape ke kolom Excel dan CSV
+  const successfulCompetitorNames = new Set(
+    competitors.map((c) => c.name || c.store),
+  );
+  const activeRanking = ranking.filter((r) =>
+    successfulCompetitorNames.has(r.store || r.name),
+  );
+
+  const rows = createScrapeRows(gameConfig, activeRanking, mainStores, competitors);
   if (!rows.length) throw new Error(`Tidak ada produk setara ${gameConfig.name}.`);
 
   fs.mkdirSync(options.outputDirectory, { recursive: true });
@@ -509,7 +517,7 @@ async function processGame(apiKey, gameConfig, options) {
   );
   const xlsxPath = await exportScrapeXlsx(
     gameConfig,
-    ranking,
+    activeRanking,
     rows,
     options.outputDirectory,
   );

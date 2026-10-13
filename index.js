@@ -342,9 +342,17 @@ async function compareGame(gameId, options = {}) {
     }
   }
 
+  // Hanya masukkan toko kompetitor yang berhasil discrape ke kolom Excel
+  const successfulCompetitorNames = new Set(
+    competitorStoreResults.map((c) => c.name || c.store),
+  );
+  const activeRanking = competitors.filter((r) =>
+    successfulCompetitorNames.has(r.store || r.name),
+  );
+
   const comparisonRows = createScrapeRows(
     gameConfig,
-    competitors,
+    activeRanking,
     mainStoreResults,
     competitorStoreResults,
   );
@@ -383,7 +391,7 @@ async function compareGame(gameId, options = {}) {
   if (comparisonRows.length > 0) {
     xlsxFilePath = await exportScrapeXlsx(
       gameConfig,
-      competitors,
+      activeRanking,
       comparisonRows,
       exportDir,
     );
