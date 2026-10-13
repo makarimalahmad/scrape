@@ -219,6 +219,36 @@ test("Filter Domain: menolak domain promo non-toko (doku.promo)", () => {
   assert.strictEqual(decision.reason, "non_store_domain");
 });
 
+test("Filter Domain: menolak domain asing regional TLD (.sg)", () => {
+  const result = {
+    link: "https://shop.garena.sg/",
+    title: "Garena Topup Center",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "free-fire", name: "Free Fire" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
+test("Filter Domain: menolak rute regional luar negeri (/en-my/)", () => {
+  const result = {
+    link: "https://joytify.com/en-my/mobile-legends",
+    title: "Top Up Mobile Legends Joytify",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "mobile-legends", name: "Mobile Legends" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
+test("Filter Domain: menolak URL beranda utama tanpa katalog game (/)", () => {
+  const result = {
+    link: "https://gamestore.com/",
+    title: "Beli Diamond Game Online Termurah",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "free-fire", name: "Free Fire" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
 // =============================================================================
 // 4. PENCOCOKAN PRODUK ROBLOX (PRODUCT MATCHER)
 // =============================================================================
