@@ -82,7 +82,7 @@ async function createOptimizedContext(browser, contextOptions = {}) {
 async function waitForProductData(page, timeout = 25_000, hostname = "") {
   const domain = hostname.replace(/^www\./, "");
   const readinessSelectors = {
-    "upoint.id": ".cursor-pointer",
+    "upoint.id": '[data-denom-label], .cursor-pointer',
     "duniagames.co.id": ".denom .price-dnm .pr",
     "unipin.com": ".denom-container > button",
     "hiddengame.id": "div.product-item",
@@ -94,17 +94,27 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
-    const ready = await page
-      .locator(readinessSelector)
-      .filter({
-        hasText:
-          /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|Rp\.?\s*\d|^\s*[1-9]\d{0,2}(?:\.\d{3})*\s*$)/i,
-      })
-      .first()
-      .waitFor({ state: "visible", timeout })
-      .then(() => true)
-      .catch(() => false);
-    if (ready) return true;
+    if (domain === "upoint.id") {
+      const ready = await page
+        .locator(readinessSelector)
+        .first()
+        .waitFor({ state: "visible", timeout })
+        .then(() => true)
+        .catch(() => false);
+      if (ready) return true;
+    } else {
+      const ready = await page
+        .locator(readinessSelector)
+        .filter({
+          hasText:
+            /(?:from\s+\d{1,3}(?:\.\d{3})+|IDR\s*[1-9]\d*|Rp\.?\s*\d|^\s*[1-9]\d{0,2}(?:\.\d{3})*\s*$)/i,
+        })
+        .first()
+        .waitFor({ state: "visible", timeout })
+        .then(() => true)
+        .catch(() => false);
+      if (ready) return true;
+    }
   }
 
   return page
@@ -160,7 +170,7 @@ async function triggerStoreSpecificInteractions(page, url) {
 
   // Handle lazy loading / smooth scroll
   await page.locator(".animate-shimmer, [class*='skeleton']").first().waitFor({ state: "detached", timeout: 8_000 }).catch(() => {});
-  await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"], div[class*="hover:border-golden-yellow"]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+  await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"], div[class*="hover:border-golden-yellow"], [data-denom-label]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
   await page.waitForTimeout(400);
 
   await page.evaluate(async () => {
