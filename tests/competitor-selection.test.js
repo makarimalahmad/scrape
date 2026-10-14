@@ -94,6 +94,35 @@ async function runAllTests() {
     assert.strictEqual(ranking[1].store, "lapakgaming.com");
   });
 
+  // 2a. Marketplace asing / P2P seller (eldorado.gg, g2g.com) otomatis ditolak
+  test("Filter Toko: marketplace asing (eldorado.gg, g2g.com) tidak masuk ranking", () => {
+    const mockOrganic = [
+      {
+        position: 1,
+        title: "Top Up Roblox Cheap - Eldorado.gg",
+        link: "https://www.eldorado.gg/id/top-up-roblox/t/70",
+        snippet: "Beli robux murah dari seller terpercaya",
+      },
+      {
+        position: 2,
+        title: "Buy Mobile Legends Diamonds - G2G",
+        link: "https://www.g2g.com/categories/mobile-legends-top-up",
+        snippet: "Cheap mobile legends top up",
+      },
+      {
+        position: 3,
+        title: "Top Up MLBB - Lapakgaming",
+        link: "https://www.lapakgaming.com/id-id/mobile-legends",
+        snippet: "Beli diamond mobile legends termurah",
+      },
+    ];
+
+    const { ranking } = selectGoogleCompetitors(mockOrganic, mockGameConfig, 5);
+    assert.strictEqual(ranking.length, 2);
+    assert.strictEqual(ranking[0].store, "itemku.com");
+    assert.strictEqual(ranking[1].store, "lapakgaming.com");
+  });
+
   // 2b. Platform donasi / tipping (saweria.co, trakteer.id) otomatis ditolak
   test("Filter Toko: platform donasi (saweria.co, trakteer.id) tidak masuk ranking", () => {
     const mockOrganic = [
