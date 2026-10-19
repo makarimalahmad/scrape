@@ -156,6 +156,40 @@ async function runAllTests() {
     assert.ok(["non_store_domain", "editorial_page"].includes(saweriaDecision.classification));
   });
 
+  // 2c. Halaman pencarian keyword marketplace (shopee.co.id/list/...) otomatis ditolak
+  test("Filter Toko: listing pencarian marketplace (shopee.co.id/list/...) tidak masuk ranking", () => {
+    const mockOrganic = [
+      {
+        position: 1,
+        title: "Jual Free Fire Top Up Diamond - Shopee",
+        link: "https://shopee.co.id/list/Free%20Fire/Top%20Up%20Diamond/Top%20Up",
+        snippet: "Beli Free Fire Top Up Diamond termurah di Shopee",
+      },
+      {
+        position: 2,
+        title: "Top Up FF - Lapakgaming",
+        link: "https://www.lapakgaming.com/id-id/free-fire",
+        snippet: "Beli diamond free fire termurah",
+      },
+    ];
+
+    const ffConfig = {
+      id: "free-fire",
+      name: "Free Fire",
+      query: "top up ff",
+      priorityStores: [{ name: "itemku.com", url: "https://itemku.com/id/g/garena-free-fire/top-up" }],
+    };
+
+    const { ranking, decisions } = selectGoogleCompetitors(mockOrganic, ffConfig, 5);
+    assert.strictEqual(ranking.length, 2);
+    assert.strictEqual(ranking[0].store, "itemku.com");
+    assert.strictEqual(ranking[1].store, "lapakgaming.com");
+    const shopeeDecision = decisions.find((d) => d.link && d.link.includes("shopee.co.id"));
+    assert.ok(shopeeDecision);
+    assert.strictEqual(shopeeDecision.eligible, false);
+    assert.strictEqual(shopeeDecision.classification, "marketplace_search");
+  });
+
   // Helper parsing request mockFetch (mendukung format query URL maupun payload POST Serper)
   function extractSearchParams(url, init) {
     if (typeof url === "string" && url.includes("?")) {
