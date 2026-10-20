@@ -1,8 +1,4 @@
-/**
- * CLI Compare URL Tool
- * Script perbandingan harga langsung antara toko utama dan toko pembanding via URL.
- */
-
+// CLI Compare URL: perbandingan harga langsung toko utama vs toko pembanding via URL
 const path = require("path");
 const readline = require("readline/promises");
 const { DEFAULT_SELECTOR, scrape, validateUrl, exportCsv } = require("./scrape");

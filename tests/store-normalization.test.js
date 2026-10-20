@@ -53,13 +53,13 @@ test("Normalisasi URL: mengarahkan rute varian produk ke form katalog utama", ()
   assert.strictEqual(normalized.href, "https://golrox.com/beli-robux/username");
 });
 
-test("Normalisasi URL: mengalihkan URL Free Fire Max gogogo.com ke katalog Free Fire kanonikal", () => {
+test("Normalisasi URL: mengalihkan URL Free Fire Max gogogo.com ke katalog Free Fire asli", () => {
   const input = "https://gogogo.com/id-id/p/topup/free-fire-max-games";
   const normalized = normalizeStoreUrl(input, { id: "free-fire" });
   assert.strictEqual(normalized.href, "https://gogogo.com/id-id/p/topup/free-fire-games");
 });
 
-test("Normalisasi URL: URL Free Fire kanonikal gogogo.com tetap mengarah ke free-fire-games", () => {
+test("Normalisasi URL: URL Free Fire asli gogogo.com tetap mengarah ke free-fire-games", () => {
   const input = "https://gogogo.com/id-id/p/topup/free-fire-games";
   const normalized = normalizeStoreUrl(input, { id: "free-fire" });
   assert.strictEqual(normalized.href, "https://gogogo.com/id-id/p/topup/free-fire-games");
