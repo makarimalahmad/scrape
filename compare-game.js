@@ -236,9 +236,9 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
   }
   worksheet.getColumn(spacerAfterCompetitors).width = 3;
   worksheet.getColumn(spacerBetweenBenchmarks).width = 3;
-  const rupiahFormat = '"Rp. "#,##0;[Red]-"Rp. "#,##0';
+  const priceFormat = '#,##0;[Red]-#,##0';
   for (let column = competitorStart; column < spacerAfterCompetitors; column += 1) {
-    worksheet.getColumn(column).numFmt = rupiahFormat;
+    worksheet.getColumn(column).numFmt = priceFormat;
   }
   for (const column of [
     lowestStart,
@@ -250,7 +250,7 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
     highestStart + 3,
     highestStart + 4,
   ]) {
-    worksheet.getColumn(column).numFmt = rupiahFormat;
+    worksheet.getColumn(column).numFmt = priceFormat;
   }
   // Format kolom persentase dengan 4 angka desimal (0.0000%)
   worksheet.getColumn(lowestStart + 2).numFmt = "0.0000%";
