@@ -84,7 +84,7 @@ function calculateComparison(mainProduct, benchmark) {
   if (!mainProduct || !benchmark) return { difference: "-", percentage: "-" };
   const difference = mainProduct.price - benchmark.product.price;
   const percentage = mainProduct.price
-    ? `${((difference / mainProduct.price) * 100).toFixed(4)}%`
+    ? Number(((difference / mainProduct.price) * 100).toFixed(2))
     : "-";
   return { difference, percentage };
 }
@@ -202,30 +202,37 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
     const values = [row.Produk];
     for (const rankedStore of ranking) values.push(row[rankedStore.store]);
     values.push("");
-    // Memasukkan data harga toko utama, selisih rupiah, dan persentase desimal ke Excel:
-    // (Persen string "7.8125%" dibagi 100 menjadi angka 0.078125 agar dikenali sebagai tipe angka oleh Excel)
+    // Memasukkan data harga toko utama, selisih rupiah, dan persentase angka 2 desimal ke Excel:
     values.push(
       row["Harga Terendah | UPoint"],
       row["Harga Terendah | UPoint Selisih"],
       row["Harga Terendah | UPoint %"] === "-"
         ? "-"
-        : Number.parseFloat(row["Harga Terendah | UPoint %"]) / 100,
+        : typeof row["Harga Terendah | UPoint %"] === "number"
+          ? row["Harga Terendah | UPoint %"]
+          : Number.parseFloat(row["Harga Terendah | UPoint %"]),
       row["Harga Terendah | DuniaGames"],
       row["Harga Terendah | DuniaGames Selisih"],
       row["Harga Terendah | DuniaGames %"] === "-"
         ? "-"
-        : Number.parseFloat(row["Harga Terendah | DuniaGames %"]) / 100,
+        : typeof row["Harga Terendah | DuniaGames %"] === "number"
+          ? row["Harga Terendah | DuniaGames %"]
+          : Number.parseFloat(row["Harga Terendah | DuniaGames %"]),
       "",
       row["Harga Tertinggi | UPoint"],
       row["Harga Tertinggi | UPoint Selisih"],
       row["Harga Tertinggi | UPoint %"] === "-"
         ? "-"
-        : Number.parseFloat(row["Harga Tertinggi | UPoint %"]) / 100,
+        : typeof row["Harga Tertinggi | UPoint %"] === "number"
+          ? row["Harga Tertinggi | UPoint %"]
+          : Number.parseFloat(row["Harga Tertinggi | UPoint %"]),
       row["Harga Tertinggi | DuniaGames"],
       row["Harga Tertinggi | DuniaGames Selisih"],
       row["Harga Tertinggi | DuniaGames %"] === "-"
         ? "-"
-        : Number.parseFloat(row["Harga Tertinggi | DuniaGames %"]) / 100,
+        : typeof row["Harga Tertinggi | DuniaGames %"] === "number"
+          ? row["Harga Tertinggi | DuniaGames %"]
+          : Number.parseFloat(row["Harga Tertinggi | DuniaGames %"]),
     );
     worksheet.addRow(values);
   }
@@ -252,11 +259,12 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
   ]) {
     worksheet.getColumn(column).numFmt = priceFormat;
   }
-  // Format kolom persentase dengan 4 angka desimal (0.0000%)
-  worksheet.getColumn(lowestStart + 2).numFmt = "0.0000%";
-  worksheet.getColumn(lowestStart + 5).numFmt = "0.0000%";
-  worksheet.getColumn(highestStart + 2).numFmt = "0.0000%";
-  worksheet.getColumn(highestStart + 5).numFmt = "0.0000%";
+  // Format kolom persentase 2 desimal tanpa simbol % (contoh: 20.10)
+  const percentFormat = "0.00;[Red]-0.00";
+  worksheet.getColumn(lowestStart + 2).numFmt = percentFormat;
+  worksheet.getColumn(lowestStart + 5).numFmt = percentFormat;
+  worksheet.getColumn(highestStart + 2).numFmt = percentFormat;
+  worksheet.getColumn(highestStart + 5).numFmt = percentFormat;
 
   const border = {
     top: { style: "thin" },
