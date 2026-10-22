@@ -18,20 +18,9 @@ const {
 } = require("./lib/extractors/special-extractors");
 const {
   extractGenericRows,
-  extractProductPairsFromJson,
 } = require("./lib/extractors/generic-extractor");
 const { normalizeStoreUrl } = require("./lib/config/game-config");
-const {
-  normalizeMobapayProductName,
-  normalizeTokopediaUrl,
-  parseBlibliOptionText,
-  parseDitusiProductRows,
-  parseDuniaGamesCardText,
-  parseRobloxProductCard,
-  parseUniPinCardText,
-  parseUPointCardText,
-  validateUrl,
-} = require("./lib/extractors/parsers");
+const { validateUrl } = require("./lib/extractors/parsers");
 const {
   createOutputName,
   exportCsv,
@@ -541,22 +530,9 @@ if (require.main === module) {
   });
 }
 
-// 100% Backward-Compatible Exports
 module.exports = {
   DEFAULT_SELECTOR,
-  detectStoreMaintenance,
   exportCsv,
-  extractProductPairsFromJson,
-  getProxyForUrl,
-  normalizeMobapayProductName,
-  normalizeTokopediaUrl,
-  parseBlibliOptionText,
-  parseDitusiProductRows,
-  parseDuniaGamesCardText,
-  parseProxy,
-  parseRobloxProductCard,
-  parseUniPinCardText,
-  parseUPointCardText,
   saveInvalidReport,
   scrape,
   validateUrl,

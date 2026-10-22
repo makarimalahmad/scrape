@@ -209,7 +209,6 @@ if (require.main === module) {
 
 module.exports = {
   collectInputs,
-  findMatches,
   getStore,
   main,
   scrapeUrl,

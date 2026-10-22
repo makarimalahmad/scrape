@@ -706,5 +706,4 @@ module.exports = {
   exportScrapeXlsx,
   matchStoreToAnchors,
   selectBenchmark,
-  printRankingTable,
 };
