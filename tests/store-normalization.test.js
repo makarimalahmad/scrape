@@ -2,6 +2,7 @@ const assert = require("assert");
 const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError } = require("../lib/google/google-search");
 const { parseRobloxProduct, parseDiamondProduct, parseNamedProduct } = require("../lib/matcher/product-matcher");
 const { validateScrapeResults, isKnownDomain } = require("../lib/validation/validate-results");
+const { extractBlibliRows } = require("../lib/extractors/special-extractors");
 
 console.log("--------------------------------------------------");
 console.log("TEST SUITE: NORMALISASI SISTEM & PRODUCT MATCHER");
@@ -369,6 +370,29 @@ test("Kebijakan Error: kegagalan proxy ditandai non-retryable", () => {
 test("Kebijakan Error: gangguan timeout koneksi tetap dicoba ulang (retryable)", () => {
   const err = new Error("Koneksi ke situs timeout (ERR_TIMED_OUT)");
   assert.strictEqual(isTemporaryScrapeError(err), true);
+});
+
+test("Ekstraktor Blibli: menangani argumen (page, url, interceptedPayloads) tanpa TypeError", () => {
+  const dummyUrl = new URL("https://www.blibli.com/digital/p/voucher-game/roblox");
+  const dummyPayloads = [
+    {
+      url: "https://www.blibli.com/backend/digital-product/products",
+      data: {
+        data: [{ name: "80 Robux", price: 15000 }],
+      },
+    },
+  ];
+  // Fungsi tidak melempar interceptedPayloads.find is not a function saat menerima URL sebagai argumen ke-2
+  assert.doesNotThrow(() => {
+    extractBlibliRows({}, dummyUrl, dummyPayloads);
+  });
+});
+
+test("Ekstraktor Blibli: aman saat interceptedPayloads kosong", () => {
+  const dummyUrl = new URL("https://www.blibli.com/digital/p/voucher-game/roblox");
+  assert.doesNotThrow(() => {
+    extractBlibliRows({ waitForFunction: () => Promise.reject(new Error("timeout")) }, dummyUrl, []);
+  });
 });
 
 // =============================================================================
