@@ -205,8 +205,8 @@ async function detectStoreMaintenance(page, response) {
         ),
       );
 
-      for (const el of modalElements) {
-        const text = el.innerText?.trim();
+      for (const elemen of modalElements) {
+        const text = elemen.innerText?.trim();
         if (text && maintenancePatterns.some((pattern) => pattern.test(text))) {
           return text.replace(/\s+/g, " ").slice(0, 120);
         }
@@ -216,8 +216,8 @@ async function detectStoreMaintenance(page, response) {
       const headers = Array.from(
         document.querySelectorAll("h1, h2, title, .maintenance-message, .error-message"),
       );
-      for (const el of headers) {
-        const text = (el.innerText || el.textContent || "").trim();
+      for (const elemen of headers) {
+        const text = (elemen.innerText || elemen.textContent || "").trim();
         if (text && maintenancePatterns.some((pattern) => pattern.test(text))) {
           return text.replace(/\s+/g, " ").slice(0, 120);
         }
@@ -230,9 +230,9 @@ async function detectStoreMaintenance(page, response) {
         if (match) {
           const barisTeks = bodySnippet.split("\n");
           for (const rawLine of barisTeks) {
-            const l = rawLine.trim();
-            if (l && pattern.test(l)) {
-              return l.slice(0, 120);
+            const baris = rawLine.trim();
+            if (baris && pattern.test(baris)) {
+              return baris.slice(0, 120);
             }
           }
           const start = Math.max(0, match.index - 25);
@@ -314,16 +314,23 @@ async function scrape(url, selector, headed, options = {}) {
         timeout: usedProxy ? 25_000 : pageTimeout,
       });
     } catch (error) {
-      if (
-        usedProxy &&
-        /timeout|err_tunnel|err_proxy|err_connection|econnreset|socket hang up|err_http_response_code_failure/i.test(
-          error.message,
-        )
-      ) {
+      const pesanError = String(error?.message || "").toLowerCase();
+      const kataKunciErrorProxy = [
+        "timeout",
+        "err_tunnel",
+        "err_proxy",
+        "err_connection",
+        "econnreset",
+        "socket hang up",
+        "err_http_response_code_failure",
+      ];
+      const terdeteksiErrorProxy = kataKunciErrorProxy.some((kata) => pesanError.includes(kata));
+
+      if (usedProxy && terdeteksiErrorProxy) {
         const proxyServerClean = proxyConfig?.server
           ? proxyConfig.server.replace(/^https?:\/\//, "")
           : "proxy";
-        const isAuthOrQuotaFailure = /err_http_response_code_failure/i.test(error.message);
+        const isAuthOrQuotaFailure = pesanError.includes("err_http_response_code_failure");
         const proxyErrMsg = isAuthOrQuotaFailure
           ? `[Proxy Error] Proxy (${proxyServerClean}) ditolak atau kuota habis (ERR_HTTP_RESPONSE_CODE_FAILURE) saat mengakses ${domain}`
           : `[Proxy Error] Proxy (${proxyServerClean}) tidak merespons atau gagal terhubung saat mengakses ${domain}`;
@@ -454,12 +461,14 @@ async function scrape(url, selector, headed, options = {}) {
     }
 
     const finalRows = [];
-    for (let i = 0; i < rows.length; i += 1) {
+    let nomorUrut = 1;
+    for (const baris of rows) {
       finalRows.push({
-        No: i + 1,
-        ...rows[i],
+        No: nomorUrut,
+        ...baris,
         Sumber: url.href,
       });
+      nomorUrut += 1;
     }
     Object.defineProperty(finalRows, "_usedProxy", {
       value: usedProxy,

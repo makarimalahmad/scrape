@@ -66,28 +66,28 @@ async function scrapeUrl(url, options = {}) {
     const calculateTax = options.calculateTax;
 
     const products = [];
-    for (const r of rawRows) {
-      let numPrice = Number(String(r.Harga || "").replace(/[^\d]/g, "")) || 0;
-      let displayPrice = r.Harga;
+    for (const baris of rawRows) {
+      let hargaAngka = Number(String(baris.Harga || "").replace(/[^\d]/g, "")) || 0;
+      let hargaTampilan = baris.Harga;
       if (calculateTax) {
-        const adjusted = applyTaxCalculation(calculateTax, {
-          rawPrice: numPrice,
-          productName: r.Produk,
-          rawProduct: r.Produk,
+        const disesuaikan = applyTaxCalculation(calculateTax, {
+          rawPrice: hargaAngka,
+          productName: baris.Produk,
+          rawProduct: baris.Produk,
           hostname,
           domain,
           url,
           game: options.gameId || null,
         });
-        if (adjusted !== numPrice) {
-          numPrice = adjusted;
-          displayPrice = `Rp ${numPrice.toLocaleString("id-ID")}`;
+        if (disesuaikan !== hargaAngka) {
+          hargaAngka = disesuaikan;
+          hargaTampilan = `Rp ${hargaAngka.toLocaleString("id-ID")}`;
         }
       }
       products.push({
-        name: r.Produk,
-        price: displayPrice,
-        rawPrice: numPrice,
+        name: baris.Produk,
+        price: hargaTampilan,
+        rawPrice: hargaAngka,
       });
     }
 
@@ -162,13 +162,13 @@ async function compareUrls(mainUrl, competitorUrl, options = {}) {
   const competitorHostname = new URL(competitorUrl).hostname;
 
   const mainProductRows = [];
-  for (const p of mainResult.products) {
-    mainProductRows.push({ Produk: p.name, Harga: p.price });
+  for (const produk of mainResult.products) {
+    mainProductRows.push({ Produk: produk.name, Harga: produk.price });
   }
 
   const competitorProductRows = [];
-  for (const p of competitorResult.products) {
-    competitorProductRows.push({ Produk: p.name, Harga: p.price });
+  for (const produk of competitorResult.products) {
+    competitorProductRows.push({ Produk: produk.name, Harga: produk.price });
   }
 
   const mainParsed = selectCheapestProducts(mainProductRows, game, {
@@ -238,9 +238,9 @@ async function compareGame(gameId, options = {}) {
 
   let gameConfig = null;
   const targetGameId = String(gameId).trim().toLowerCase();
-  for (const g of GAME_CONFIGS) {
-    if (g.id.toLowerCase() === targetGameId) {
-      gameConfig = g;
+  for (const config of GAME_CONFIGS) {
+    if (config.id.toLowerCase() === targetGameId) {
+      gameConfig = config;
       break;
     }
   }
@@ -323,31 +323,31 @@ async function compareGame(gameId, options = {}) {
     await browser.close();
   }
 
-  const isStoreSuccess = (s) =>
-    Boolean(s && !s.error && s.products && s.products.size > 0);
+  const isStoreSuccess = (toko) =>
+    Boolean(toko && !toko.error && toko.products && toko.products.size > 0);
 
   const mainStoreNames = new Set();
-  for (const m of gameConfig.mainStores) {
-    mainStoreNames.add(m.name);
+  for (const tokoUtama of gameConfig.mainStores) {
+    mainStoreNames.add(tokoUtama.name);
   }
 
   const mainStoreResults = [];
   const competitorStoreResults = [];
-  for (const s of allStores) {
-    if (!isStoreSuccess(s)) continue;
-    if (mainStoreNames.has(s.name)) {
-      mainStoreResults.push(s);
+  for (const toko of allStores) {
+    if (!isStoreSuccess(toko)) continue;
+    if (mainStoreNames.has(toko.name)) {
+      mainStoreResults.push(toko);
     } else {
-      competitorStoreResults.push(s);
+      competitorStoreResults.push(toko);
     }
   }
 
   // Hanya masukkan toko kompetitor yang berhasil discrape ke kolom Excel
   const successfulCompetitorNames = new Set(
-    competitorStoreResults.map((c) => c.name || c.store),
+    competitorStoreResults.map((toko) => toko.name || toko.store),
   );
-  const activeRanking = competitors.filter((r) =>
-    successfulCompetitorNames.has(r.store || r.name),
+  const activeRanking = competitors.filter((tokoRank) =>
+    successfulCompetitorNames.has(tokoRank.store || tokoRank.name),
   );
 
   const comparisonRows = createScrapeRows(
@@ -403,11 +403,11 @@ async function compareGame(gameId, options = {}) {
     generatedAt: new Date().toISOString(),
     storeCount: allStores.length,
     successfulStoreCount: allStores.filter(isStoreSuccess).length,
-    stores: allStores.map((s) => {
-      const success = isStoreSuccess(s);
+    stores: allStores.map((toko) => {
+      const success = isStoreSuccess(toko);
       let status = "FAILED";
-      let cleanReason = s.error
-        ? String(s.error)
+      let cleanReason = toko.error
+        ? String(toko.error)
             .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")
             .split(/\nCall log:/i)[0]
             .replace(/\s+/g, " ")
@@ -419,16 +419,16 @@ async function compareGame(gameId, options = {}) {
         reason = null;
       }
       return {
-        name: s.name,
-        classification: s.position == null || s.position === "Utama" ? "MAIN_STORE" : "COMPETITOR",
-        position: s.position === "Utama" ? null : (s.position || null),
-        organicPosition: s.organicPosition ?? null,
-        url: s.url,
-        productCount: s.products?.size || 0,
+        name: toko.name,
+        classification: toko.position == null || toko.position === "Utama" ? "MAIN_STORE" : "COMPETITOR",
+        position: toko.position === "Utama" ? null : (toko.position || null),
+        organicPosition: toko.organicPosition ?? null,
+        url: toko.url,
+        productCount: toko.products?.size || 0,
         status,
         reason,
-        confidence: s.confidence || 0,
-        usedProxy: Boolean(s.usedProxy),
+        confidence: toko.confidence || 0,
+        usedProxy: Boolean(toko.usedProxy),
       };
     }),
     comparisonTable: comparisonRows,

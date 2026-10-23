@@ -159,6 +159,12 @@ function createScrapeRows(gameConfig, ranking, mainStores, competitors) {
   return rows;
 }
 
+// Pastikan nilai persentase berupa angka desimal atau tanda "-" untuk Excel
+function formatNilaiPersen(nilai) {
+  if (nilai === "-" || typeof nilai === "number") return nilai;
+  return Number.parseFloat(nilai);
+}
+
 function createScrapeWorkbook(gameConfig, ranking, rows) {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(gameConfig.name.slice(0, 31), {
@@ -206,33 +212,17 @@ function createScrapeWorkbook(gameConfig, ranking, rows) {
     values.push(
       row["Harga Terendah | UPoint"],
       row["Harga Terendah | UPoint Selisih"],
-      row["Harga Terendah | UPoint %"] === "-"
-        ? "-"
-        : typeof row["Harga Terendah | UPoint %"] === "number"
-          ? row["Harga Terendah | UPoint %"]
-          : Number.parseFloat(row["Harga Terendah | UPoint %"]),
+      formatNilaiPersen(row["Harga Terendah | UPoint %"]),
       row["Harga Terendah | DuniaGames"],
       row["Harga Terendah | DuniaGames Selisih"],
-      row["Harga Terendah | DuniaGames %"] === "-"
-        ? "-"
-        : typeof row["Harga Terendah | DuniaGames %"] === "number"
-          ? row["Harga Terendah | DuniaGames %"]
-          : Number.parseFloat(row["Harga Terendah | DuniaGames %"]),
+      formatNilaiPersen(row["Harga Terendah | DuniaGames %"]),
       "",
       row["Harga Tertinggi | UPoint"],
       row["Harga Tertinggi | UPoint Selisih"],
-      row["Harga Tertinggi | UPoint %"] === "-"
-        ? "-"
-        : typeof row["Harga Tertinggi | UPoint %"] === "number"
-          ? row["Harga Tertinggi | UPoint %"]
-          : Number.parseFloat(row["Harga Tertinggi | UPoint %"]),
+      formatNilaiPersen(row["Harga Tertinggi | UPoint %"]),
       row["Harga Tertinggi | DuniaGames"],
       row["Harga Tertinggi | DuniaGames Selisih"],
-      row["Harga Tertinggi | DuniaGames %"] === "-"
-        ? "-"
-        : typeof row["Harga Tertinggi | DuniaGames %"] === "number"
-          ? row["Harga Tertinggi | DuniaGames %"]
-          : Number.parseFloat(row["Harga Tertinggi | DuniaGames %"]),
+      formatNilaiPersen(row["Harga Tertinggi | DuniaGames %"]),
     );
     worksheet.addRow(values);
   }
@@ -389,16 +379,16 @@ function printRankingTable(ranking) {
   const maxColumns = process.stdout.columns || 120;
   const headers = ["No", "Toko", "Google Rank", "Tipe", "URL Target"];
 
-  const rawRows = ranking.map((r) => [
-    String(r.position),
-    r.store,
-    String(r.organicPosition ?? "-"),
-    r.isPriority ? "Priority" : "Organik",
-    r.link,
+  const rawRows = ranking.map((itemRanking) => [
+    String(itemRanking.position),
+    itemRanking.store,
+    String(itemRanking.organicPosition ?? "-"),
+    itemRanking.isPriority ? "Priority" : "Organik",
+    itemRanking.link,
   ]);
 
-  const colWidths = headers.map((h, i) =>
-    Math.max(h.length, ...rawRows.map((row) => row[i].length))
+  const colWidths = headers.map((header, indexKolom) =>
+    Math.max(header.length, ...rawRows.map((row) => row[indexKolom].length))
   );
 
   const fixedWidthWithoutUrl =
@@ -409,9 +399,9 @@ function printRankingTable(ranking) {
     colWidths[4] = availableForUrl;
   }
 
-  const truncate = (str, len) => {
-    if (str.length <= len) return str;
-    return str.slice(0, len - 3) + "...";
+  const potongTeks = (teks, batasPanjang) => {
+    if (teks.length <= batasPanjang) return teks;
+    return teks.slice(0, batasPanjang - 3) + "...";
   };
 
   const rows = rawRows.map((row) => [
@@ -419,7 +409,7 @@ function printRankingTable(ranking) {
     row[1].padEnd(colWidths[1]),
     row[2].padStart(colWidths[2]),
     row[3].padEnd(colWidths[3]),
-    truncate(row[4], colWidths[4]).padEnd(colWidths[4]),
+    potongTeks(row[4], colWidths[4]).padEnd(colWidths[4]),
   ]);
 
   const paddedHeaders = [
@@ -431,9 +421,9 @@ function printRankingTable(ranking) {
   ];
 
   const formatLine = (items) => "│ " + items.join(" │ ") + " │";
-  const topBorder = "┌─" + colWidths.map((w) => "─".repeat(w)).join("─┬─") + "─┐";
-  const midBorder = "├─" + colWidths.map((w) => "─".repeat(w)).join("─┼─") + "─┤";
-  const botBorder = "└─" + colWidths.map((w) => "─".repeat(w)).join("─┴─") + "─┘";
+  const topBorder = "┌─" + colWidths.map((lebar) => "─".repeat(lebar)).join("─┬─") + "─┐";
+  const midBorder = "├─" + colWidths.map((lebar) => "─".repeat(lebar)).join("─┼─") + "─┤";
+  const botBorder = "└─" + colWidths.map((lebar) => "─".repeat(lebar)).join("─┴─") + "─┘";
 
   console.log(topBorder);
   console.log(formatLine(paddedHeaders));
@@ -509,10 +499,10 @@ async function processGame(apiKey, gameConfig, options) {
 
   // Hanya masukkan toko kompetitor yang berhasil discrape ke kolom Excel dan CSV
   const successfulCompetitorNames = new Set(
-    competitors.map((c) => c.name || c.store),
+    competitors.map((toko) => toko.name || toko.store),
   );
-  const activeRanking = ranking.filter((r) =>
-    successfulCompetitorNames.has(r.store || r.name),
+  const activeRanking = ranking.filter((tokoRank) =>
+    successfulCompetitorNames.has(tokoRank.store || tokoRank.name),
   );
 
   const rows = createScrapeRows(gameConfig, activeRanking, mainStores, competitors);
@@ -584,8 +574,8 @@ async function processGame(apiKey, gameConfig, options) {
     },
     summary: {
       totalStores: allStoreEntries.length,
-      successfulStores: allStoreEntries.filter((s) => s.status.startsWith("SUCCESS")).length,
-      failedStores: allStoreEntries.filter((s) => s.status.startsWith("FAILED")).length,
+      successfulStores: allStoreEntries.filter((toko) => toko.status.startsWith("SUCCESS")).length,
+      failedStores: allStoreEntries.filter((toko) => toko.status.startsWith("FAILED")).length,
     },
     stores: allStoreEntries,
   };
@@ -632,11 +622,12 @@ async function main() {
     : 10;
   const defaultConcurrency = process.env.SCRAPER_CONCURRENCY || "3";
   const concurrencyValue = Number(getArgument("concurrency", headed ? "1" : defaultConcurrency));
-  const concurrency = headed
-    ? 1
-    : Number.isInteger(concurrencyValue)
-      ? Math.min(4, Math.max(1, concurrencyValue))
-      : 3;
+  let concurrency = 3;
+  if (headed) {
+    concurrency = 1;
+  } else if (Number.isInteger(concurrencyValue)) {
+    concurrency = Math.min(4, Math.max(1, concurrencyValue));
+  }
   const generatedAt = new Date().toISOString();
   const date = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
   const runDirectory = createUniqueRunDirectory(path.resolve(__dirname, "output"), date);
