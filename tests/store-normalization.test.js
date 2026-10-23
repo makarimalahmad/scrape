@@ -241,6 +241,16 @@ test("Filter Domain: menolak rute regional luar negeri (/en-my/)", () => {
   assert.strictEqual(decision.reason, "non_store_domain");
 });
 
+test("Filter Domain: menolak rute regional luar negeri (/my/en/)", () => {
+  const result = {
+    link: "https://gold.razer.com/my/en/gold/catalog/mobile-legends",
+    title: "Mobile Legends Bang Bang Razer Gold Malaysia",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "mobile-legends", name: "Mobile Legends" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
 test("Filter Domain: menolak URL beranda utama tanpa katalog game (/)", () => {
   const result = {
     link: "https://gamestore.com/",

@@ -375,6 +375,7 @@ async function scrape(url, selector, headed, options = {}) {
         !options.disableProxy &&
         !options.forceProxy &&
         !options._proxyRetried &&
+        domain !== "itemku.com" &&
         Boolean(options.proxy ? parseProxy(options.proxy) : parseProxy());
 
       if (canFallbackToProxy) {
