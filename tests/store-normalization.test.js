@@ -3,6 +3,7 @@ const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError
 const { parseRobloxProduct, parseDiamondProduct, parseNamedProduct } = require("../lib/matcher/product-matcher");
 const { validateScrapeResults, isKnownDomain } = require("../lib/validation/validate-results");
 const { extractBlibliRows } = require("../lib/extractors/special-extractors");
+const { extractProductPairsFromJson } = require("../lib/extractors/generic-extractor");
 
 console.log("--------------------------------------------------");
 console.log("TEST SUITE: NORMALISASI SISTEM & PRODUCT MATCHER");
@@ -393,6 +394,36 @@ test("Ekstraktor Blibli: aman saat interceptedPayloads kosong", () => {
   assert.doesNotThrow(() => {
     extractBlibliRows({ waitForFunction: () => Promise.reject(new Error("timeout")) }, dummyUrl, []);
   });
+});
+
+test("Ekstraktor Generik JSON: mengekstrak data dari Schema.org offers dan dataLayer GA4", () => {
+  const mockPayload = [
+    {
+      "@type": "Product",
+      name: "Weekly Elite Pass",
+      offers: { price: 27500, priceCurrency: "IDR" },
+    },
+    {
+      item_name: "86 Diamonds",
+      price: 21000,
+    },
+  ];
+  const rows = extractProductPairsFromJson(mockPayload);
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0].Produk, "Weekly Elite Pass");
+  assert.strictEqual(rows[0].Harga, "Rp 27.500");
+  assert.strictEqual(rows[1].Produk, "86 Diamonds");
+  assert.strictEqual(rows[1].Harga, "Rp 21.000");
+});
+
+test("Ekstraktor Generik JSON: menolak produk non-game atau nominal tidak valid", () => {
+  const mockPayload = [
+    { name: "Kemeja Flanel Pria", price: 150000 },
+    { name: "Voucher Game", price: 0 },
+    { name: "86 Diamonds", price: null },
+  ];
+  const rows = extractProductPairsFromJson(mockPayload);
+  assert.strictEqual(rows.length, 0);
 });
 
 // =============================================================================

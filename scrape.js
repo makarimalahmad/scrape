@@ -72,7 +72,7 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
   const domain = hostname.replace(/^www\./, "");
   const readinessSelectors = {
     "upoint.id": '[data-denom-label], .cursor-pointer',
-    "duniagames.co.id": ".denom .price-dnm .pr",
+    "duniagames.co.id": ".denom",
     "unipin.com": ".denom-container > button",
     "hiddengame.id": "div.product-item",
     "bangjeff.com": '[class*="group/variant"]',
@@ -83,7 +83,7 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
   };
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
-    if (domain === "upoint.id") {
+    if (domain === "upoint.id" || domain === "duniagames.co.id") {
       const ready = await page
         .locator(readinessSelector)
         .first()
@@ -159,7 +159,7 @@ async function triggerStoreSpecificInteractions(page, url) {
 
   // Handle lazy loading / smooth scroll
   await page.locator(".animate-shimmer, [class*='skeleton']").first().waitFor({ state: "detached", timeout: 8_000 }).catch(() => {});
-  await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"], div[class*="hover:border-golden-yellow"], [data-denom-label]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+  await page.locator('.main-info, div[class*="price-container"], .denom, .product-card, .sku-card, .SKU_type, [class*="sku"], [class*="SKU"], [class*="group/variant"], .pDRoot, div[class*="cursor-pointer"], div[class*="hover:border-golden-yellow"], [data-denom-label]').first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
   await page.waitForTimeout(400);
 
   await page.evaluate(async () => {
