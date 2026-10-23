@@ -8,7 +8,7 @@ Sistem ini secara otomatis menelusuri toko kompetitor teratas di Google Indonesi
 
 ## Game yang Didukung
 
-| Game                          | ID Game (`gameId`) | Toko Utama         | Varian Produk yang Dipantau                     |
+| Game                          | ID Game (`gameId`) | Toko Utama         | Cakupan Produk                                  |
 | :---------------------------- | :----------------- | :----------------- | :---------------------------------------------- |
 | **Mobile Legends: Bang Bang** | `mobile-legends`   | UPoint, DuniaGames | Diamonds, Weekly Diamond Pass, Twilight Pass    |
 | **Free Fire**                 | `free-fire`        | UPoint, DuniaGames | Diamonds, Membership Mingguan & Bulanan         |
@@ -16,30 +16,30 @@ Sistem ini secara otomatis menelusuri toko kompetitor teratas di Google Indonesi
 
 ---
 
-## Instalasi
+## Installation
 
-Kebutuhan: **Node.js 18+**.
+Requirements: **Node.js 18+**.
 
 ```bash
-# Pasang paket SDK
+# Install SDK package
 npm install @makarimalahmad/price-scraper-sdk
 
-# Pasang browser Chromium Playwright
+# Install browser Chromium Playwright
 npx playwright install chromium
 ```
 
 ---
 
-## Konfigurasi (`.env`)
+## Configuration (`.env`)
 
-Salin `.env.example` menjadi `.env`, lalu isi konfigurasi:
+Copy `.env.example` ke `.env`, lalu sesuaikan konfigurasi:
 
 ```env
 # Google Search API (Serper.dev)
 SERPER_API_KEY=ISI_KEY_SERPER
 
-# Pengaturan Opsional
-SCRAPER_LIMIT=10            # Jumlah kompetitor yang diambil (Default: 10, batas 1 - 10)
+# Optional Settings
+SCRAPER_LIMIT=10            # Jumlah kompetitor organik Google (Default: 10, batas 1 - 10)
 SCRAPER_CONCURRENCY=3       # Tab browser paralel (Default: 3, batas 1 - 4)
 SCRAPER_MAX_ATTEMPTS=3     # Batas coba ulang saat halaman lambat (Default: 3, batas 1 - 5)
 
@@ -50,9 +50,9 @@ SCRAPER_MAX_ATTEMPTS=3     # Batas coba ulang saat halaman lambat (Default: 3, b
 
 ---
 
-## Penggunaan SDK
+## Usage & Examples
 
-### 1. Komparasi Harga Game (`compareGame`)
+### 1. Compare Game Prices (`compareGame`)
 
 Mengambil harga toko utama (UPoint & DuniaGames), mencari kompetitor di Google, dan mengembalikan data perbandingan harga:
 
@@ -77,7 +77,7 @@ async function run() {
 run();
 ```
 
-### 2. Scrape URL Tunggal (`scrapeUrl`)
+### 2. Scrape Single URL (`scrapeUrl`)
 
 Mengambil daftar produk dan harga dari satu URL toko:
 
@@ -99,7 +99,7 @@ run();
 
 ---
 
-## Format Data Output
+## Output Format
 
 Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
 
@@ -178,7 +178,7 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
 
 ---
 
-## Parameter `compareGame(gameId, options)`
+## Parameters & Options (`compareGame`)
 
 ### `gameId` (String):
 - `'mobile-legends'`
@@ -200,7 +200,7 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
 
 ---
 
-## Penyesuaian Pajak & Biaya (`calculateTax`)
+## Tax & Fee Calculation (`calculateTax`)
 
 Default: scraper mengambil harga asli yang tertera di situs toko.
 
@@ -233,9 +233,9 @@ Catatan:
 
 ---
 
-## Eksekusi CLI & Pengujian
+## CLI Runner & Testing
 
-### CLI:
+### Run via CLI:
 
 ```bash
 # Semua game
@@ -245,7 +245,7 @@ node compare-game.js --game all
 node compare-game.js --game mobile-legends --limit 5
 ```
 
-### Pengujian:
+### Run Tests:
 
 ```bash
 npm test
