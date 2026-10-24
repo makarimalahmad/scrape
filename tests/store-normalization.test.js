@@ -85,6 +85,21 @@ test("Normalisasi URL: Tokopedia dialihkan ke slug voucher-game katalog resmi", 
   assert.strictEqual(normalized.href, "https://www.tokopedia.com/digital/voucher-game/free-fire");
 });
 
+test("Normalisasi URL: GoPay hub /games dialihkan ke katalog spesifik game", () => {
+  const input = "https://gopay.co.id/games";
+  const normalizedFF = normalizeStoreUrl(input, { id: "free-fire" });
+  assert.strictEqual(normalizedFF.href, "https://gopay.co.id/games/free-fire");
+
+  const normalizedML = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalizedML.href, "https://gopay.co.id/games/mobile-legends-bang-bang");
+});
+
+test("Normalisasi URL: GoPay katalog resmi game tetap dipertahankan", () => {
+  const input = "https://gopay.co.id/games/mobile-legends-bang-bang";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.href, "https://gopay.co.id/games/mobile-legends-bang-bang");
+});
+
 test("Known Domain: Toko terdaftar dikenali sebagai domain resmi yang didukung", () => {
   assert.strictEqual(isKnownDomain("tokopedia.com"), true);
   assert.strictEqual(isKnownDomain("blibli.com"), true);
