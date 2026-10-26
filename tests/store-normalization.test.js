@@ -2,7 +2,7 @@ const assert = require("assert");
 const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError } = require("../lib/google/google-search");
 const { parseRobloxProduct, parseDiamondProduct, parseNamedProduct, parsePrice } = require("../lib/matcher/product-matcher");
 const { validateScrapeResults, isKnownDomain } = require("../lib/validation/validate-results");
-const { extractBlibliRows } = require("../lib/extractors/special-extractors");
+const { extractBlibliRows, STORE_EXTRACTORS, extractSpecialRows } = require("../lib/extractors/special-extractors");
 const { extractProductPairsFromJson } = require("../lib/extractors/generic-extractor");
 
 console.log("--------------------------------------------------");
@@ -476,6 +476,19 @@ test("Ekstraktor Generik JSON: menolak produk non-game atau nominal tidak valid"
   ];
   const rows = extractProductPairsFromJson(mockPayload);
   assert.strictEqual(rows.length, 0);
+});
+
+test("Ekstraktor Khusus: STORE_EXTRACTORS mendaftarkan semua toko kunci", () => {
+  const targetStores = ["itemku.com", "lootbar.com", "topup.ggwp.id", "dana.id", "unipin.com", "gogogo.com"];
+  for (const store of targetStores) {
+    assert.strictEqual(typeof STORE_EXTRACTORS[store], "function", `Ekstraktor untuk ${store} harus terdaftar sebagai fungsi`);
+  }
+});
+
+test("Ekstraktor Khusus: extractSpecialRows mengembalikan null untuk domain yang tidak memiliki ekstraktor khusus", async () => {
+  const mockUrl = new URL("https://unknown-shop-random.com/mlbb");
+  const result = await extractSpecialRows({}, mockUrl);
+  assert.strictEqual(result, null);
 });
 
 // =============================================================================
