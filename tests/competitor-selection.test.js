@@ -190,6 +190,33 @@ async function runAllTests() {
     assert.strictEqual(shopeeDecision.classification, "marketplace_search");
   });
 
+  // 2d. Domain non-store / blacklisted (yagami-cell.com) otomatis ditolak
+  test("Filter Toko: domain blacklist yagami-cell.com tidak masuk ranking", () => {
+    const mockOrganic = [
+      {
+        position: 1,
+        title: "Top Up MLBB - Yagami Cell",
+        link: "https://yagami-cell.com/id/mobile-legends",
+        snippet: "Top up diamond mobile legends di yagami cell",
+      },
+      {
+        position: 2,
+        title: "Top Up MLBB - Lapakgaming",
+        link: "https://www.lapakgaming.com/id-id/mobile-legends",
+        snippet: "Beli diamond mobile legends termurah",
+      },
+    ];
+
+    const { ranking, decisions } = selectGoogleCompetitors(mockOrganic, mockGameConfig, 5);
+    assert.strictEqual(ranking.length, 2);
+    assert.strictEqual(ranking[0].store, "itemku.com");
+    assert.strictEqual(ranking[1].store, "lapakgaming.com");
+    const yagamiDecision = decisions.find((d) => d.link && d.link.includes("yagami-cell.com"));
+    assert.ok(yagamiDecision);
+    assert.strictEqual(yagamiDecision.eligible, false);
+    assert.strictEqual(yagamiDecision.classification, "non_store_domain");
+  });
+
   // Helper parsing request mockFetch (mendukung format query URL maupun payload POST Serper)
   function extractSearchParams(url, init) {
     if (typeof url === "string" && url.includes("?")) {
