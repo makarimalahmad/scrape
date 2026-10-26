@@ -100,12 +100,25 @@ test("Normalisasi URL: GoPay katalog resmi game tetap dipertahankan", () => {
   assert.strictEqual(normalized.href, "https://gopay.co.id/games/mobile-legends-bang-bang");
 });
 
+test("Normalisasi URL: mengalihkan URL SEAGM MLBB global ke katalog resmi Indonesia", () => {
+  const input = "https://www.seagm.com/id-id/mobile-legends-diamonds-top-up?srsltid=AYCX9vKIRcUE2KMLUnqx1iQhBaeoCSd6knvOzOk1RiG9VC1MWprwx4Zs";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.pathname, "/id-id/mlbb-diamonds-top-up-id");
+});
+
+test("Normalisasi URL: SEAGM katalog resmi Indonesia tidak mengalami perubahan", () => {
+  const input = "https://www.seagm.com/id-id/mlbb-diamonds-top-up-id";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.pathname, "/id-id/mlbb-diamonds-top-up-id");
+});
+
 test("Known Domain: Toko terdaftar dikenali sebagai domain resmi yang didukung", () => {
   assert.strictEqual(isKnownDomain("tokopedia.com"), true);
   assert.strictEqual(isKnownDomain("blibli.com"), true);
   assert.strictEqual(isKnownDomain("lapakgaming.com"), true);
   assert.strictEqual(isKnownDomain("gogogo.com"), true);
   assert.strictEqual(isKnownDomain("casatopup.com"), true);
+  assert.strictEqual(isKnownDomain("seagm.com"), true);
   assert.strictEqual(isKnownDomain("toko-asing-palsu.com"), false);
 });
 
