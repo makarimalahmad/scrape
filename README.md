@@ -209,27 +209,35 @@ Jika harga kompetitor perlu disesuaikan dengan PPN (misal 11%) atau biaya transa
 ```javascript
 const { compareGame } = require("@makarimalahmad/price-scraper-sdk");
 
-const result = await compareGame("mobile-legends", {
-  calculateTax: {
-    // Persentase per domain toko:
-    "unipin.com": 11, // PPN 11% (angka)
-    "itemku.com": "0.7%", // QRIS 0.7% (string %)
-    "ditusi.co.id": 12.11, // PPN 11% + QRIS 1.11%
+async function run() {
+  const result = await compareGame("mobile-legends", {
+    calculateTax: {
+      // Persentase per domain toko:
+      "unipin.com": 11, // PPN 11% (angka)
+      "itemku.com": "0.7%", // QRIS 0.7% (string %)
+      "ditusi.co.id": 12.11, // PPN 11% + QRIS 1.11%
 
-    // Khusus per game dalam satu domain:
-    "codashop.com": {
-      "mobile-legends": 11,
-      "free-fire": 11,
-      roblox: 0,
+      // Khusus per game dalam satu domain:
+      "codashop.com": {
+        "mobile-legends": 11,
+        "free-fire": 11,
+        "roblox": 0,
+        "default": 11,
+      },
     },
-  },
-});
+  });
+
+  console.log(result.comparisonTable);
+}
+
+run();
 ```
 
 Catatan:
 - Domain yang tidak terdaftar di dictionary tetap memakai harga asli.
 - Format nilai menerima string persen (`"11%"`, `"0.7%"`), string angka (`"11"`), atau angka murni (`11`).
 - Domain dicocokkan otomatis (tidak terpengaruh awalan `www.` atau huruf besar/kecil).
+- Pada aturan khusus per game, tersedia opsi `default` sebagai nilai cadangan untuk game lain yang tidak dicantumkan secara spesifik.
 
 ---
 
