@@ -20,12 +20,20 @@ const {
   extractGenericRows,
 } = require("./lib/extractors/generic-extractor");
 const { normalizeStoreUrl } = require("./lib/config/game-config");
-const { validateUrl } = require("./lib/extractors/parsers");
 const {
   createOutputName,
   exportCsv,
   saveInvalidReport,
 } = require("./lib/utils/export-csv");
+
+// Validasi protokol URL (harus http atau https)
+function validateUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("URL harus memakai HTTP atau HTTPS.");
+  }
+  return url;
+}
 
 const DEFAULT_SELECTOR =
   '.denom, article, li, label, button, [role="radio"], [class*="product"], [class*="item"], [class*="card"], [class*="denom"]';
