@@ -175,6 +175,16 @@ test("Filter Domain: menolak domain agregator (linktr.ee)", () => {
   assert.strictEqual(decision.reason, "non_store_domain");
 });
 
+test("Filter Domain: menolak domain blacklist luar negeri (bdgameghor.com)", () => {
+  const result = {
+    link: "https://www.bdgameghor.com/product/free-fire-diamond-top-up-bd/",
+    title: "Free Fire Diamond Top Up BD",
+  };
+  const decision = classifyTopUpCompetitorResult(result, { id: "free-fire", name: "Free Fire" });
+  assert.strictEqual(decision.eligible, false);
+  assert.strictEqual(decision.reason, "non_store_domain");
+});
+
 // =============================================================================
 // 3. DETEKSI & PENOLAKAN ARTIKEL BLOG / BERITA (HEURISTIC)
 // =============================================================================

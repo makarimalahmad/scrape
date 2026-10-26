@@ -217,6 +217,30 @@ async function runAllTests() {
     assert.strictEqual(yagamiDecision.classification, "non_store_domain");
   });
 
+  // 2e. Domain non-store / luar negeri blacklisted (bdgameghor.com) otomatis ditolak
+  test("Filter Toko: domain blacklist bdgameghor.com tidak masuk ranking", () => {
+    const mockOrganic = [
+      {
+        position: 1,
+        title: "Free Fire Diamond Top Up BD - BD Game Ghor",
+        link: "https://www.bdgameghor.com/product/free-fire-diamond-top-up-bd/",
+        snippet: "Top up Free Fire Diamond BD server at BD Game Ghor",
+      },
+      {
+        position: 2,
+        title: "Top Up FF Murah - Lapakgaming",
+        link: "https://www.lapakgaming.com/id-id/free-fire",
+        snippet: "Beli diamond free fire termurah",
+      },
+    ];
+
+    const { ranking, decisions } = selectGoogleCompetitors(mockOrganic, mockGameConfig, 5);
+    const bdDecision = decisions.find((d) => d.link && d.link.includes("bdgameghor.com"));
+    assert.ok(bdDecision);
+    assert.strictEqual(bdDecision.eligible, false);
+    assert.strictEqual(bdDecision.classification, "non_store_domain");
+  });
+
   // Helper parsing request mockFetch (mendukung format query URL maupun payload POST Serper)
   function extractSearchParams(url, init) {
     if (typeof url === "string" && url.includes("?")) {
