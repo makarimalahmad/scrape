@@ -1,6 +1,6 @@
 const assert = require("assert");
 const { normalizeStoreUrl, classifyTopUpCompetitorResult, isTemporaryScrapeError } = require("../lib/google/google-search");
-const { parseRobloxProduct, parseDiamondProduct, parseNamedProduct } = require("../lib/matcher/product-matcher");
+const { parseRobloxProduct, parseDiamondProduct, parseNamedProduct, parsePrice } = require("../lib/matcher/product-matcher");
 const { validateScrapeResults, isKnownDomain } = require("../lib/validation/validate-results");
 const { extractBlibliRows } = require("../lib/extractors/special-extractors");
 const { extractProductPairsFromJson } = require("../lib/extractors/generic-extractor");
@@ -132,6 +132,20 @@ test("Matcher Named Product: variasi teks 'Membership Mingguan' cocok ke Member 
 
   const p3 = parseNamedProduct("Bulanan Membership");
   assert.strictEqual(p3?.key, "Member Bulanan");
+});
+
+test("Matcher Price: teks multi-harga diskon & harga coret hanya mengambil nominal aktif", () => {
+  assert.strictEqual(parsePrice("Rp 27.320 12% Rp 32.765"), 27320);
+  assert.strictEqual(parsePrice("Rp 36.426 12% Rp 42.919"), 36426);
+  assert.strictEqual(parsePrice("Rp 73.286 12% Rp 82.388"), 73286);
+  assert.strictEqual(parsePrice("Rp 843"), 843);
+  assert.strictEqual(parsePrice("15000"), 15000);
+});
+
+test("Matcher Diamond: paket combo bundling membership tidak dianggap diamond murni", () => {
+  assert.strictEqual(parseDiamondProduct("Mingguan + 355 Diamond"), null);
+  assert.strictEqual(parseDiamondProduct("Bulanan + 50 Diamond"), null);
+  assert.strictEqual(parseDiamondProduct("Membership + 100 Diamond"), null);
 });
 
 // =============================================================================
