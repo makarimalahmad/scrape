@@ -112,6 +112,30 @@ test("Normalisasi URL: SEAGM katalog resmi Indonesia tidak mengalami perubahan",
   assert.strictEqual(normalized.pathname, "/id-id/mlbb-diamonds-top-up-id");
 });
 
+test("Normalisasi URL: mengalihkan URL UniPin regional Malaysia (/my/) ke katalog Indonesia (/id/)", () => {
+  const input = "https://www.unipin.com/my/mobile-legends";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.href, "https://www.unipin.com/id/mobile-legends");
+});
+
+test("Normalisasi URL: menyisipkan prefix /id/ pada URL UniPin tanpa kode negara", () => {
+  const input = "https://www.unipin.com/mobile-legends";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.href, "https://www.unipin.com/id/mobile-legends");
+});
+
+test("Normalisasi URL: URL UniPin Indonesia resmi (/id/) tetap dipertahankan", () => {
+  const input = "https://www.unipin.com/id/mobile-legends";
+  const normalized = normalizeStoreUrl(input, { id: "mobile-legends" });
+  assert.strictEqual(normalized.href, "https://www.unipin.com/id/mobile-legends");
+});
+
+test("Normalisasi URL: mengalihkan URL UniPin regional asing lainnya (/ph/) ke /id/", () => {
+  const input = "https://www.unipin.com/ph/game/free-fire";
+  const normalized = normalizeStoreUrl(input, { id: "free-fire" });
+  assert.strictEqual(normalized.href, "https://www.unipin.com/id/game/free-fire");
+});
+
 test("Known Domain: Toko terdaftar dikenali sebagai domain resmi yang didukung", () => {
   assert.strictEqual(isKnownDomain("tokopedia.com"), true);
   assert.strictEqual(isKnownDomain("blibli.com"), true);
