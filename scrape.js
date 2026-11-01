@@ -93,9 +93,17 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
   if (readinessSelector) {
     if (domain === "upoint.id" || domain === "duniagames.co.id") {
       const ready = await page
-        .locator(readinessSelector)
-        .first()
-        .waitFor({ state: "visible", timeout })
+        .waitForFunction(
+          (sel) => {
+            if (document.querySelector(sel)) return true;
+            const text = document.body?.innerText || "";
+            return /sedang\s+(dalam\s+)?(pemeliharaan|perbaikan|maintenance)|pemeliharaan\s+sistem|under\s+maintenance|gangguan\s+(sistem|layanan)|temporarily\s+unavailable/i.test(
+              text,
+            );
+          },
+          readinessSelector,
+          { timeout, polling: 300 },
+        )
         .then(() => true)
         .catch(() => false);
       if (ready) return true;
@@ -122,6 +130,13 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
           /sorry, you have been blocked|attention required|access denied|captcha|cloudflare|performing security verification|verifies you are not a bot|malicious bots|verifikasi keamanan|verifikasi bahwa anda|just a moment|\bray id:/i.test(
             text,
           );
+        // Hentikan tunggu jika halaman menampilkan status pemeliharaan/maintenance
+        const maintenanceVisible =
+          /sedang\s+(dalam\s+)?(pemeliharaan|perbaikan|maintenance)|pemeliharaan\s+sistem|under\s+maintenance|gangguan\s+(sistem|layanan)|temporarily\s+unavailable/i.test(
+            text,
+          );
+        if (maintenanceVisible) return true;
+
         const hasPrice = /(?:Rp\.?|IDR|USD|US\$|\$|RM)\s*\d/i.test(text);
         const hasProduct =
           /(?:diamond|\bdm\b|berlian|pass|booyah|evo\s*vault|pack|card|member|membership|robux|voucher|\buc\b|point|token|crystal|gold|coin|credit)/i.test(
@@ -445,7 +460,23 @@ async function scrape(url, selector, headed, options = {}) {
     }
 
     // 4. Interaksi Khusus & Ekstraksi Produk
+    const earlyMaintenance = await detectStoreMaintenance(page, response);
+    if (earlyMaintenance) {
+      const error = new Error(`[Maintenance] Akses ke ${domain} dilewati: ${earlyMaintenance}`);
+      error.retryable = false;
+      error.isMaintenance = true;
+      throw error;
+    }
+
     await triggerStoreSpecificInteractions(page, url);
+
+    const postInteractionMaintenance = await detectStoreMaintenance(page, response);
+    if (postInteractionMaintenance) {
+      const error = new Error(`[Maintenance] Akses ke ${domain} dilewati: ${postInteractionMaintenance}`);
+      error.retryable = false;
+      error.isMaintenance = true;
+      throw error;
+    }
 
     // Coba ekstraksi khusus untuk toko yang memiliki struktur DOM unik
     let rows = await extractSpecialRows(page, url, interceptedPayloads);
