@@ -204,10 +204,6 @@ async function detectStoreMaintenance(page, response) {
         /pemeliharaan\s+sistem/i,
         /gangguan\s+(sistem|transaksi|layanan)/i,
         /layanan\s+sedang\s+tidak\s+tersedia/i,
-        /item\s+(sedang\s+)?habis/i,
-        /produk\s+(sedang\s+)?habis/i,
-        /stok\s+(sedang\s+)?(habis|kosong)/i,
-        /out\s+of\s+stock/i,
         /under\s+maintenance/i,
         /temporarily\s+unavailable/i,
         /we('?ll| will)\s+be\s+back\s+soon/i,
@@ -453,7 +449,23 @@ async function scrape(url, selector, headed, options = {}) {
     }
 
     // 4. Interaksi Khusus & Ekstraksi Produk
+    const earlyMaintenance = await detectStoreMaintenance(page, response);
+    if (earlyMaintenance) {
+      const error = new Error(`[Maintenance] Akses ke ${domain} dilewati: ${earlyMaintenance}`);
+      error.retryable = false;
+      error.isMaintenance = true;
+      throw error;
+    }
+
     await triggerStoreSpecificInteractions(page, url);
+
+    const postInteractionMaintenance = await detectStoreMaintenance(page, response);
+    if (postInteractionMaintenance) {
+      const error = new Error(`[Maintenance] Akses ke ${domain} dilewati: ${postInteractionMaintenance}`);
+      error.retryable = false;
+      error.isMaintenance = true;
+      throw error;
+    }
 
     // Coba ekstraksi khusus untuk toko yang memiliki struktur DOM unik
     let rows = await extractSpecialRows(page, url, interceptedPayloads);
