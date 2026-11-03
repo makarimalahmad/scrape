@@ -4,6 +4,8 @@ Otomatisasi untuk memantau dan membandingkan harga voucher game (**Mobile Legend
 
 Sistem ini secara otomatis menelusuri toko kompetitor teratas di Google Indonesia, mengambil harga terkini dari masing-masing situs, menyetarakan nama produk, lalu menyusun laporan perbandingan harga antara toko utama (**UPoint** dan **DuniaGames**) dengan toko kompetitor ke dalam format **Excel (.xlsx)** dan **CSV**.
 
+📖 **Dokumentasi Lengkap:** [Baca Panduan Sistem di Google Docs](https://docs.google.com/document/d/18x9UoO69zJS5ZlJl1WqcHHhiDKlX32SUlwB_mbCf_9Y/edit?usp=sharing)
+
 ---
 
 ## Game yang Didukung
