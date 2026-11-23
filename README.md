@@ -22,6 +22,15 @@ Sistem ini secara otomatis menelusuri toko kompetitor teratas di Google Indonesi
 
 Requirements: **Node.js 18+**.
 
+Package ini di-host di GitHub Packages. Buat file `.npmrc` di root project (atau folder user) menggunakan GitHub token dengan izin `read:packages`:
+
+```ini
+@makarimalahmad:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=ISI_GITHUB_TOKEN
+```
+
+Lalu install SDK dan browser Chromium Playwright:
+
 ```bash
 # Install SDK package
 npm install @makarimalahmad/price-scraper-sdk
@@ -71,7 +80,9 @@ async function run() {
   });
 
   console.log(`Game: ${result.game}`);
-  console.log(`Toko berhasil: ${result.successfulStoreCount}/${result.storeCount}`);
+  console.log(
+    `Toko berhasil: ${result.successfulStoreCount}/${result.storeCount}`,
+  );
   console.log(result.comparisonTable);
   console.log(result.summary);
 }
@@ -99,6 +110,14 @@ async function run() {
 run();
 ```
 
+Opsi `scrapeUrl(url, options)`:
+
+- `gameId`: ID game untuk validasi produk (`"mobile-legends"`, `"free-fire"`, `"roblox"`).
+- `exportCsvPath`: path file (tanpa `.csv`) jika ingin simpan hasil ke CSV.
+- `calculateTax`, `proxy`, `headed`, `selector`: opsional, format sama seperti di `compareGame`.
+
+Output mengembalikan `{ success, url, products, count, confidence, status, reasons, csvPath }` (ditambah `error` jika gagal), dengan tiap item di `products` berisi `{ name, price, rawPrice }`.
+
 ---
 
 ## Output Format
@@ -107,7 +126,7 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
 
 ```json
 {
-  "game": "Mobile Legends: Bang Bang",
+  "game": "Mobile Legends",
   "gameId": "mobile-legends",
   "generatedAt": "2026-10-13T04:30:00.000Z",
   "storeCount": 12,
@@ -169,36 +188,46 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
 
 ### Properti Utama:
 
-| Properti | Tipe | Deskripsi |
-| :--- | :--- | :--- |
-| `game` | `string` | Nama game. |
-| `successfulStoreCount` | `number` | Jumlah toko yang berhasil discrape. |
-| `stores` | `Array<Object>` | Metadata toko (nama, URL, peringkat Google, status scraping). |
-| `comparisonTable` | `Array<Object>` | Baris produk dan kolom harga per toko beserta selisih nominal dan persentase. |
-| `summary` | `Array<Object>` | Toko dan harga termurah per produk. |
-| `xlsxFilePath` | `string \| null` | Path file Excel (.xlsx) jika opsi ekspor aktif. |
+| Properti               | Tipe             | Deskripsi                                                                      |
+| :--------------------- | :--------------- | :----------------------------------------------------------------------------- |
+| `game`                 | `string`         | Nama game.                                                                     |
+| `successfulStoreCount` | `number`         | Jumlah toko yang berhasil discrape.                                            |
+| `stores`               | `Array<Object>`  | Metadata toko (nama, URL, peringkat Google, status scraping).                  |
+| `comparisonTable`      | `Array<Object>`  | Baris produk dan kolom harga per toko beserta selisih nominal dan persentase.  |
+| `summary`              | `Array<Object>`  | Toko dan harga termurah per produk.                                            |
+| `xlsxFilePath`         | `string \| null` | Path file Excel (.xlsx) yang otomatis dibuat (`null` jika data kosong).        |
+
+Catatan output:
+
+- File Excel (`scrape-<gameId>.xlsx`) otomatis disimpan di folder harian default (atau folder `exportXlsxDirectory`) dan hanya menampilkan kompetitor yang berhasil discrape, dengan highlight hijau untuk harga terendah dan merah untuk harga tertinggi di tiap baris.
+- Properti `confidence` (`100` jika valid, `0` jika gagal) berasal dari validasi hasil scrape (filter noise seperti metode bayar/diskon, cek mata uang & nominal minimal, serta jumlah produk valid).
+- Produk antar toko dicocokkan dengan exact match terlebih dahulu, lalu proximity match khusus diamond (toleransi maks 10%, antara 1–3 diamond) dengan memilih harga termurah per denominasi.
+- Jika salah satu toko gagal atau diblokir, proses toko lain tetap lanjut dan status gagalnya dicatat di `stores`.
 
 ---
 
 ## Parameters & Options (`compareGame`)
 
 ### `gameId` (String):
+
 - `'mobile-legends'`
 - `'free-fire'`
 - `'roblox'`
 
 ### `options` (Object):
 
-| Opsi | Tipe | Default | Keterangan |
-| :--- | :--- | :--- | :--- |
-| `limit` | `number` | `10` | Jumlah kompetitor organik Google (1 - 10). |
-| `calculateTax` | `Object` | `null` | Aturan penyesuaian pajak/biaya transaksi per domain. |
-| `apiKey` | `string` | `process.env.SERPER_API_KEY` | Serper API key. |
-| `concurrency` | `number` | `3` | Jumlah tab browser paralel (1 - 4). |
-| `maxAttempts` | `number` | `3` | Batas coba ulang saat halaman lambat (1 - 5). |
-| `headed` | `boolean` | `false` | Jalankan browser secara visual (debug lokal). |
-| `exportXlsxDirectory` | `string` | Folder harian default | Folder penyimpanan file Excel (.xlsx). |
-| `proxy` | `string \| Object` | `null` | Konfigurasi proxy. |
+| Opsi                  | Tipe               | Default                      | Keterangan                                                                                                       |
+| :-------------------- | :----------------- | :--------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+| `limit`               | `number`           | `10`                         | Jumlah kompetitor organik Google (1 - 10).                                                                       |
+| `calculateTax`        | `Object`           | `null`                       | Aturan penyesuaian pajak/biaya transaksi per domain.                                                             |
+| `apiKey`              | `string`           | `process.env.SERPER_API_KEY` | Serper API key.                                                                                                  |
+| `concurrency`         | `number`           | `3`                          | Jumlah tab browser paralel (1 - 4; otomatis 1 jika `headed: true`).                                              |
+| `maxAttempts`         | `number`           | `3`                          | Batas coba ulang saat halaman lambat (1 - 5).                                                                    |
+| `headed`              | `boolean`          | `false`                      | Jalankan browser secara visual (debug lokal).                                                                    |
+| `exportXlsxDirectory` | `string`           | Folder harian default        | Folder penyimpanan file Excel (.xlsx).                                                                           |
+| `proxy`               | `string \| Object` | `null`                       | Konfigurasi proxy (`http://user:pass@host:port`, `host:port:user:pass`, atau `{ server, username, password }`). |
+
+Domain di `PROXY_DOMAINS` langsung lewat proxy, sedangkan toko lain dicoba direct terlebih dahulu dan otomatis pindah ke proxy (failover) jika terkena blokir/Cloudflare.
 
 ---
 
@@ -223,8 +252,8 @@ async function run() {
       "codashop.com": {
         "mobile-legends": 11,
         "free-fire": 11,
-        "roblox": 0,
-        "default": 11,
+        roblox: 0,
+        default: 11,
       },
     },
   });
@@ -236,6 +265,7 @@ run();
 ```
 
 Catatan:
+
 - Domain yang tidak terdaftar di dictionary tetap memakai harga asli.
 - Format nilai menerima string persen (`"11%"`, `"0.7%"`), string angka (`"11"`), atau angka murni (`11`).
 - Domain dicocokkan otomatis (tidak terpengaruh awalan `www.` atau huruf besar/kecil).
