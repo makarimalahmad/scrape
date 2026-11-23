@@ -44,7 +44,7 @@ const {
  * @param {string} [options.exportCsvPath] - Optional path to export CSV
  * @param {Object} [options.calculateTax] - Optional dictionary of tax/fee rules per store domain
  * @param {string|Object} [options.proxy] - Optional proxy URL string (host:port:user:pass or http://...) or proxy object
- * @returns {Promise<{ success: boolean, url: string, products: Array<{ name: string, price: string, rawPrice: number }>, count: number, confidence: number, status: string, error?: string, csvPath?: string, reasons?: string[] }>}
+ * @returns {Promise<{ success: boolean, url: string, products: Array<{ name: string, price: string, rawPrice: number }>, count: number, status: string, error?: string, csvPath?: string, reasons?: string[] }>}
  */
 async function scrapeUrl(url, options = {}) {
   try {
@@ -101,7 +101,6 @@ async function scrapeUrl(url, options = {}) {
       url,
       products,
       count: products.length,
-      confidence: validation.confidence,
       status: validation.status,
       reasons: validation.reasons,
       csvPath,
@@ -112,7 +111,6 @@ async function scrapeUrl(url, options = {}) {
       url,
       products: [],
       count: 0,
-      confidence: 0,
       status: "FAILED",
       error: error.message,
     };
@@ -427,7 +425,6 @@ async function compareGame(gameId, options = {}) {
         productCount: toko.products?.size || 0,
         status,
         reason,
-        confidence: toko.confidence || 0,
         usedProxy: Boolean(toko.usedProxy),
       };
     }),

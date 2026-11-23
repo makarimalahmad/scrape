@@ -116,7 +116,7 @@ Opsi `scrapeUrl(url, options)`:
 - `exportCsvPath`: path file (tanpa `.csv`) jika ingin simpan hasil ke CSV.
 - `calculateTax`, `proxy`, `headed`, `selector`: opsional, format sama seperti di `compareGame`.
 
-Output mengembalikan `{ success, url, products, count, confidence, status, reasons, csvPath }` (ditambah `error` jika gagal), dengan tiap item di `products` berisi `{ name, price, rawPrice }`.
+Output mengembalikan `{ success, url, products, count, status, reasons, csvPath }` (ditambah `error` jika gagal), dengan tiap item di `products` berisi `{ name, price, rawPrice }`.
 
 ---
 
@@ -141,7 +141,6 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
       "productCount": 24,
       "status": "SUCCESS",
       "reason": null,
-      "confidence": 100,
       "usedProxy": false
     },
     {
@@ -153,7 +152,6 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
       "productCount": 22,
       "status": "SUCCESS",
       "reason": null,
-      "confidence": 100,
       "usedProxy": false
     }
   ],
@@ -200,7 +198,7 @@ Struktur objek yang dikembalikan oleh `compareGame(gameId)`:
 Catatan output:
 
 - File Excel (`scrape-<gameId>.xlsx`) otomatis disimpan di folder harian default (atau folder `exportXlsxDirectory`) dan hanya menampilkan kompetitor yang berhasil discrape, dengan highlight hijau untuk harga terendah dan merah untuk harga tertinggi di tiap baris.
-- Properti `confidence` (`100` jika valid, `0` jika gagal) berasal dari validasi hasil scrape (filter noise seperti metode bayar/diskon, cek mata uang & nominal minimal, serta jumlah produk valid).
+- Sebelum dimasukkan ke hasil, data tiap toko divalidasi terlebih dahulu (filter noise seperti metode bayar/diskon, cek mata uang & nominal minimal, serta jumlah produk valid).
 - Produk antar toko dicocokkan dengan exact match terlebih dahulu, lalu proximity match khusus diamond (toleransi maks 10%, antara 1–3 diamond) dengan memilih harga termurah per denominasi.
 - Jika salah satu toko gagal atau diblokir, proses toko lain tetap lanjut dan status gagalnya dicatat di `stores`.
 
