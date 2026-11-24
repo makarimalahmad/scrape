@@ -583,46 +583,28 @@ async function testAsync(name, fn) {
   );
 
   await testAsync(
-    "Ekstraktor UniPin Roblox: mendukung kartu DOM multi-baris, page Puppeteer, dan fallback standar",
+    "Ekstraktor UniPin Roblox: mendukung format multi-baris Gift Card dan fallback tombol standar",
     async () => {
       const { parseRobloxProduct } = require("../lib/matcher/product-matcher");
 
-      const domCardPage = {
-        evaluate: async () => ({
-          domCards: [
-            "Rp50.000,- Roblox Gift Card\nIDR 48.440",
-            "Rp100.000,- Roblox Gift Card\nIDR 96.880",
-          ],
-          bodyText: "",
-        }),
-      };
-      const domRows = await extractSpecialRows(
-        domCardPage,
-        new URL("https://www.unipin.com/id/game/roblox"),
-      );
-      assert.strictEqual(domRows.length, 2);
-      assert.strictEqual(domRows[0].Produk, "Roblox IDR 50.000");
-      assert.strictEqual(domRows[0].Harga, "IDR 48.440");
-      assert.strictEqual(parseRobloxProduct(domRows[0].Produk).key, "Roblox IDR 50000");
-
       const robloxGiftCardPage = {
         evaluate: async () =>
-          "Header\nPilih Jumlah\nRp10.000,- Roblox Gift Card IDR 10.000\nRp20.000,- Roblox Gift Card IDR 20.000\nPilih Saluran Pembayaran",
+          "Header\nPilih Jumlah\nRp50.000,- Roblox Gift Card\nIDR 48.440\nRp100.000,- Roblox Gift Card IDR 96.880\nPilih Saluran Pembayaran",
       };
       const giftCardRows = await extractSpecialRows(
         robloxGiftCardPage,
         new URL("https://www.unipin.com/id/game/roblox"),
       );
       assert.strictEqual(giftCardRows.length, 2);
-      assert.strictEqual(giftCardRows[0].Produk, "Roblox IDR 10.000");
-      assert.strictEqual(giftCardRows[0].Harga, "IDR 10.000");
-      assert.strictEqual(parseRobloxProduct(giftCardRows[0].Produk).key, "Roblox IDR 10000");
+      assert.strictEqual(giftCardRows[0].Produk, "Roblox IDR 50.000");
+      assert.strictEqual(giftCardRows[0].Harga, "IDR 48.440");
+      assert.strictEqual(parseRobloxProduct(giftCardRows[0].Produk).key, "Roblox IDR 50000");
 
       let fallbackCallCount = 0;
       const robloxButtonPage = {
         evaluate: async (_fn, arg) => {
           fallbackCallCount += 1;
-          if (fallbackCallCount === 1) return "Halaman tanpa teks Pilih Jumlah";
+          if (fallbackCallCount === 1) return "Halaman tanpa teks Gift Card";
           if (arg && arg.selectorKartu) return [];
           return ["80 Robux\nIDR 15.000", "400 Robux\nIDR 75.000"];
         },
@@ -638,52 +620,26 @@ async function testAsync(name, fn) {
   );
 
   await testAsync(
-    "Ekstraktor Tokogame Roblox: klik tab kategori & konversi harga ringkas Rp K",
+    "Ekstraktor Tokogame Roblox: mengambil paket __NEXT_DATA__ & konversi harga sebelum PPN",
     async () => {
       const { parseRobloxProduct } = require("../lib/matcher/product-matcher");
-      let activeTab = "Vouchers";
       const tokogameMockPage = {
-        evaluate: async (fn, arg) => {
-          const fnSrc = fn.toString();
-          if (fnSrc.includes("priceMatches") || fnSrc.includes("hasNestedProductCard")) {
-            if (activeTab === "Roblox Gift Card IDR") {
-              return [
-                { name: "Roblox Gift Card IDR 50K", priceLine: "Rp 42K" },
-                { name: "Roblox Gift Card IDR 100K", priceLine: "Rp 84K" },
-              ];
-            }
-            if (activeTab === "Roblox Gift Card USD (US Acc. Only)") {
-              return [{ name: "Roblox USD 10 Global", priceLine: "Rp 159K" }];
-            }
-            return [];
-          }
-          if (Array.isArray(arg)) {
-            const allTabs = [
-              "Vouchers",
-              "Roblox Gift Card IDR",
-              "Roblox Gift Card USD (US Acc. Only)",
-            ];
-            return allTabs.filter((label) => !arg.includes(label));
-          }
-          if (typeof arg === "string") {
-            activeTab = arg;
-            return true;
-          }
-          return [];
-        },
-        waitForTimeout: async () => {},
+        evaluate: async () => [
+          { translations: [{ language: "ID", title: "Roblox Gift Card IDR 50K" }], priceInCents: 4725000 },
+          { translations: [{ language: "ID", title: "800 Robux" }], priceInCents: 16872000 },
+        ],
       };
 
       const rows = await extractSpecialRows(
         tokogameMockPage,
         new URL("https://www.tokogame.com/id-id/digital/roblox-robux-vouchers"),
       );
-      assert.strictEqual(rows.length, 3);
+      assert.strictEqual(rows.length, 2);
       assert.strictEqual(rows[0].Produk, "Roblox Gift Card IDR 50K");
-      assert.strictEqual(rows[0].Harga, "Rp 42.000");
+      assert.strictEqual(rows[0].Harga, "Rp 42.568");
       assert.strictEqual(parseRobloxProduct(rows[0].Produk).key, "Roblox IDR 50000");
-      assert.strictEqual(rows[2].Produk, "Roblox USD 10 Global");
-      assert.strictEqual(rows[2].Harga, "Rp 159.000");
+      assert.strictEqual(rows[1].Produk, "800 Robux");
+      assert.strictEqual(rows[1].Harga, "Rp 152.000");
     },
   );
 

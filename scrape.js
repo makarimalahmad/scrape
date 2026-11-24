@@ -88,25 +88,12 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
     "lapakgaming.com": '[class*="rounded-xl"], [class*="cursor-pointer"]',
     "gogogo.com": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
     "gogogo.id": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
+    "tokogame.com": "#__NEXT_DATA__",
   };
-  if (domain === "tokogame.com") {
-    const ready = await page
-      .waitForFunction(
-        () => {
-          const text = document.body?.innerText || "";
-          return /pilih paket|(?:Rp\.?|IDR)\s*\d|pemeliharaan|maintenance/i.test(text);
-        },
-        null,
-        { timeout, polling: 300 },
-      )
-      .then(() => true)
-      .catch(() => false);
-    if (ready) return true;
-  }
 
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
-    if (domain === "upoint.id" || domain === "duniagames.co.id") {
+    if (domain === "upoint.id" || domain === "duniagames.co.id" || domain === "tokogame.com") {
       const ready = await page
         .waitForFunction(
           (sel) => {
