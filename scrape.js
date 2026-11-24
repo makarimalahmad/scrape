@@ -89,6 +89,21 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
     "gogogo.com": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
     "gogogo.id": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
   };
+  if (domain === "tokogame.com") {
+    const ready = await page
+      .waitForFunction(
+        () => {
+          const text = document.body?.innerText || "";
+          return /pilih paket|(?:Rp\.?|IDR)\s*\d|pemeliharaan|maintenance/i.test(text);
+        },
+        null,
+        { timeout, polling: 300 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (ready) return true;
+  }
+
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
     if (domain === "upoint.id" || domain === "duniagames.co.id") {
@@ -323,7 +338,7 @@ async function scrape(url, selector, headed, options = {}) {
       const pageTimeout = Number(options.pageTimeout || process.env.PAGE_TIMEOUT_MS) || 90_000;
       response = await page.goto(url.href, {
         waitUntil: "domcontentloaded",
-        timeout: usedProxy ? 25_000 : pageTimeout,
+        timeout: usedProxy ? 45_000 : pageTimeout,
       });
     } catch (error) {
       const pesanError = String(error?.message || "").toLowerCase();
@@ -350,6 +365,7 @@ async function scrape(url, selector, headed, options = {}) {
         const proxyError = new Error(proxyErrMsg);
         proxyError.proxyFailed = true;
         proxyError.usedProxy = true;
+        proxyError.isProxyTimeout = !isAuthOrQuotaFailure;
         if (isAuthOrQuotaFailure || options._proxyRetried) {
           proxyError.retryable = false;
         }
@@ -513,7 +529,8 @@ async function scrape(url, selector, headed, options = {}) {
     // Auto-fallback ke Real Browser jika Playwright gagal karena proteksi Cloudflare atau API timeout
     if (
       !options._realBrowserRetried &&
-      /cloudflare|api produk|challenge|blocked|just a moment|turnstile/i.test(error.message)
+      (error.isProxyTimeout ||
+        /cloudflare|api produk|challenge|blocked|just a moment|turnstile/i.test(error.message))
     ) {
       try {
         console.log(`[Real Browser Fallback] Mencoba pemulihan otomatis via Real Browser untuk ${domain}...`);
