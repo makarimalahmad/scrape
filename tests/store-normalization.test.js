@@ -525,13 +525,97 @@ test("Ekstraktor Khusus: extractSpecialRows mengembalikan null untuk domain yang
   assert.strictEqual(result, null);
 });
 
-// =============================================================================
-// RINGKASAN AKHIR
-// =============================================================================
-console.log("--------------------------------------------------");
-console.log(`HASIL: ${testsPassed} Lolos, ${testsFailed} Gagal`);
-console.log("--------------------------------------------------");
-
-if (testsFailed > 0) {
-  process.exit(1);
+async function testAsync(name, fn) {
+  try {
+    await fn();
+    console.log(`  ✅ PASS: ${name}`);
+    testsPassed++;
+  } catch (err) {
+    console.error(`  ❌ FAIL: ${name}`);
+    console.error(`     Error: ${err.message}`);
+    testsFailed++;
+  }
 }
+
+(async () => {
+  await testAsync(
+    "Ekstraktor UniPin MLBB: kompatibel dengan page Puppeteer (tanpa locator) dan mengabaikan tombol UI",
+    async () => {
+      let evaluateCallCount = 0;
+      const puppeteerMockPage = {
+        // Sengaja tidak memiliki page.locator seperti browser dari puppeteer-real-browser
+        evaluate: async (_fn, arg) => {
+          evaluateCallCount += 1;
+          if (evaluateCallCount === 1 && arg && arg.selectorKartu) {
+            // Simulasikan extractCards sempat menangkap tombol UI non-harga
+            return [
+              { Produk: "ALLOW ALL", Harga: "Rp ALLOW ALL" },
+              { Produk: "MASUK", Harga: "Rp MASUK" },
+            ];
+          }
+          return [
+            "ALLOW ALL",
+            "Total\nIDR 22.000",
+            "5 Diamonds\nIDR 1.500",
+            "86 Diamonds\nIDR 22.000",
+          ];
+        },
+      };
+
+      const rows = await extractSpecialRows(
+        puppeteerMockPage,
+        new URL("https://www.unipin.com/id/mobile-legends"),
+      );
+      assert.strictEqual(rows.length, 2);
+      assert.strictEqual(rows[0].Produk, "5 Diamonds");
+      assert.strictEqual(rows[0].Harga, "IDR 1.500");
+      assert.strictEqual(rows[1].Produk, "86 Diamonds");
+      assert.strictEqual(rows[1].Harga, "IDR 22.000");
+    },
+  );
+
+  await testAsync(
+    "Ekstraktor UniPin Roblox: kompatibel dengan page Puppeteer dan fallback ke tombol standar",
+    async () => {
+      const robloxGiftCardPage = {
+        evaluate: async () =>
+          "Header\nPilih Jumlah\nRp10.000,- Roblox Gift Card IDR 10.000\nRp20.000,- Roblox Gift Card IDR 20.000\nPilih Saluran Pembayaran",
+      };
+      const giftCardRows = await extractSpecialRows(
+        robloxGiftCardPage,
+        new URL("https://www.unipin.com/id/game/roblox"),
+      );
+      assert.strictEqual(giftCardRows.length, 2);
+      assert.strictEqual(giftCardRows[0].Produk, "Roblox IDR 10.000");
+      assert.strictEqual(giftCardRows[0].Harga, "IDR 10.000");
+
+      let fallbackCallCount = 0;
+      const robloxButtonPage = {
+        evaluate: async (_fn, arg) => {
+          fallbackCallCount += 1;
+          if (fallbackCallCount === 1) return "Halaman tanpa teks Pilih Jumlah";
+          if (arg && arg.selectorKartu) return [];
+          return ["80 Robux\nIDR 15.000", "400 Robux\nIDR 75.000"];
+        },
+      };
+      const buttonRows = await extractSpecialRows(
+        robloxButtonPage,
+        new URL("https://www.unipin.com/id/game/roblox"),
+      );
+      assert.strictEqual(buttonRows.length, 2);
+      assert.strictEqual(buttonRows[0].Produk, "80 Robux");
+      assert.strictEqual(buttonRows[0].Harga, "IDR 15.000");
+    },
+  );
+
+  // =============================================================================
+  // RINGKASAN AKHIR
+  // =============================================================================
+  console.log("--------------------------------------------------");
+  console.log(`HASIL: ${testsPassed} Lolos, ${testsFailed} Gagal`);
+  console.log("--------------------------------------------------");
+
+  if (testsFailed > 0) {
+    process.exit(1);
+  }
+})();
