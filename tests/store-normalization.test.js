@@ -643,6 +643,128 @@ async function testAsync(name, fn) {
     },
   );
 
+  await testAsync(
+    "Ekstraktor UniPin Free Fire interaktif: klik tombol nominal tanpa harga langsung lalu baca harga Saluran Pembayaran",
+    async () => {
+      const { selectCheapestProducts } = require("../lib/matcher/product-matcher");
+      const priceByDenom = {
+        "5 Free Fire Diamonds": 1000,
+        "12 Free Fire Diamonds": 2000,
+        "50 Free Fire Diamonds": 8000,
+      };
+      let activeDenom = "";
+      let evalStep = 0;
+
+      const interactiveFfPage = {
+        evaluate: async (_fn, arg) => {
+          evalStep += 1;
+          if (arg && arg.selectorKartu) {
+            return [];
+          }
+          if (evalStep === 2) {
+            return [];
+          }
+          if (typeof arg === "boolean") {
+            return Object.keys(priceByDenom);
+          }
+          if (typeof arg === "string") {
+            activeDenom = arg;
+            return true;
+          }
+          if (activeDenom && priceByDenom[activeDenom]) {
+            return { minPrice: priceByDenom[activeDenom], checkoutItem: activeDenom };
+          }
+          return null;
+        },
+      };
+
+      const rows = await extractSpecialRows(
+        interactiveFfPage,
+        new URL("https://www.unipin.com/id/garena/free-fire"),
+      );
+      assert.strictEqual(rows.length, 3);
+      assert.deepStrictEqual(rows[0], { Produk: "5 Free Fire Diamonds", Harga: "IDR 1.000" });
+      assert.deepStrictEqual(rows[1], { Produk: "12 Free Fire Diamonds", Harga: "IDR 2.000" });
+      assert.deepStrictEqual(rows[2], { Produk: "50 Free Fire Diamonds", Harga: "IDR 8.000" });
+
+      const validation = validateScrapeResults("https://www.unipin.com/id/garena/free-fire", rows, "free-fire");
+      assert.strictEqual(validation.valid, true);
+      assert.strictEqual(validation.validCount, 3);
+
+      const matched = selectCheapestProducts(rows, "free-fire", {
+        store: "unipin.com",
+        hostname: "www.unipin.com",
+        url: "https://www.unipin.com/id/garena/free-fire",
+      });
+      assert.strictEqual(matched.size, 3);
+    },
+  );
+
+  await testAsync(
+    "Ekstraktor UniPin Roblox interaktif: tolak label Gift Card terpotong dan klik tombol nominal untuk baca harga IDR",
+    async () => {
+      const { selectCheapestProducts } = require("../lib/matcher/product-matcher");
+      const priceByDenom = {
+        "Rp50.000,- Roblox Gift Card": 48440,
+        "MOST POPULAR Rp100.000,- Roblox Gift Card": 96500,
+      };
+      let activeDenom = "";
+      let evalStep = 0;
+
+      const interactiveRobloxPage = {
+        evaluate: async (_fn, arg) => {
+          evalStep += 1;
+          // Call 1: bodyText awal tidak memiliki harga IDR inline di kartu nominal
+          if (evalStep === 1) {
+            return "1 Pilih Jumlah\nRp50.000,- Roblox Gift Card\nMOST POPULAR\nRp100.000,- Roblox Gift Card\n2 Pilih Saluran Pembayaran\nCheckout Total IDR 0";
+          }
+          // Call 2: extractCards salah mengira nominal Rp50.000 sebagai harga dan memotong nama menjadi ",- Roblox Gift Card"
+          if (arg && arg.selectorKartu) {
+            return [
+              { Produk: ",- Roblox Gift Card", Harga: "Rp50.000" },
+              { Produk: "MOST POPULAR ,- Roblox Gift Card", Harga: "Rp100.000" },
+            ];
+          }
+          // Call 3: fallback teks kartu kosong
+          if (evalStep === 3) {
+            return [];
+          }
+          if (typeof arg === "boolean") {
+            assert.strictEqual(arg, true);
+            return Object.keys(priceByDenom);
+          }
+          if (typeof arg === "string") {
+            activeDenom = arg;
+            return true;
+          }
+          if (activeDenom && priceByDenom[activeDenom]) {
+            return { minPrice: priceByDenom[activeDenom], checkoutItem: activeDenom };
+          }
+          return null;
+        },
+      };
+
+      const rows = await extractSpecialRows(
+        interactiveRobloxPage,
+        new URL("https://www.unipin.com/id/game/roblox"),
+      );
+      assert.strictEqual(rows.length, 2);
+      assert.deepStrictEqual(rows[0], { Produk: "Roblox IDR 50.000", Harga: "IDR 48.440" });
+      assert.deepStrictEqual(rows[1], { Produk: "Roblox IDR 100.000", Harga: "IDR 96.500" });
+
+      const validation = validateScrapeResults("https://www.unipin.com/id/game/roblox", rows, "roblox");
+      assert.strictEqual(validation.valid, true);
+      assert.strictEqual(validation.validCount, 2);
+
+      const matched = selectCheapestProducts(rows, "roblox", {
+        store: "unipin.com",
+        hostname: "www.unipin.com",
+        url: "https://www.unipin.com/id/game/roblox",
+      });
+      assert.strictEqual(matched.size, 2);
+    },
+  );
+
   // =============================================================================
   // RINGKASAN AKHIR
   // =============================================================================

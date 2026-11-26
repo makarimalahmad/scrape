@@ -93,7 +93,34 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
 
   const readinessSelector = readinessSelectors[domain];
   if (readinessSelector) {
-    if (domain === "upoint.id" || domain === "duniagames.co.id" || domain === "tokogame.com") {
+    if (domain === "unipin.com") {
+      const ready = await page
+        .waitForFunction(
+          () => {
+            const text = document.body?.innerText || "";
+            if (/pemeliharaan|maintenance/i.test(text)) return true;
+            const denomEls = Array.from(
+              document.querySelectorAll(
+                ".denom-container button, div.form-check-label-rounded-lg, button.position-relative",
+              ),
+            );
+            const hasDenomButton = denomEls.some((el) =>
+              /(?:diamond|roblox|gift\s*card|robux|pass|member|IDR\s*[1-9]|Rp\.?\s*[1-9])/i.test(
+                el.innerText || "",
+              ),
+            );
+            if (hasDenomButton) return true;
+            return /(?:pilih\s+jumlah|select\s+denomination)[\s\S]{0,600}?(?:diamond|roblox|gift\s*card|robux|pass|member)/i.test(
+              text,
+            );
+          },
+          null,
+          { timeout, polling: 300 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (ready) return true;
+    } else if (domain === "upoint.id" || domain === "duniagames.co.id" || domain === "tokogame.com") {
       const ready = await page
         .waitForFunction(
           (sel) => {
