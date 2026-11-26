@@ -86,8 +86,8 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
     "bangjeff.com": '[class*="group/variant"]',
     "ourastore.com": '[class*="group/variant"]',
     "lapakgaming.com": '[class*="rounded-xl"], [class*="cursor-pointer"]',
-    "gogogo.com": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
-    "gogogo.id": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"]',
+    "gogogo.com": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"], button.bg-tile, button.bg-tile-selected',
+    "gogogo.id": 'div[class*="hover:border-golden-yellow"], div[class*="rounded-xl"], button.bg-tile, button.bg-tile-selected',
     "tokogame.com": "#__NEXT_DATA__",
   };
 

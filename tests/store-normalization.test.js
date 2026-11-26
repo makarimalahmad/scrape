@@ -67,6 +67,22 @@ test("Normalisasi URL: URL Free Fire asli gogogo.com tetap mengarah ke free-fire
   assert.strictEqual(normalized.href, "https://gogogo.com/id-id/p/topup/free-fire-games");
 });
 
+test("Normalisasi URL: mengalihkan URL umum gogogo.com (/id-id/coins) ke katalog resmi per game", () => {
+  const input = "https://gogogo.com/id-id/coins";
+  assert.strictEqual(
+    normalizeStoreUrl(input, { id: "roblox" }).href,
+    "https://gogogo.com/id-id/p/topup/roblox-games",
+  );
+  assert.strictEqual(
+    normalizeStoreUrl(input, { id: "mobile-legends" }).href,
+    "https://gogogo.com/id-id/p/topup/mobile-legends-games",
+  );
+  assert.strictEqual(
+    normalizeStoreUrl(input, { id: "free-fire" }).href,
+    "https://gogogo.com/id-id/p/topup/free-fire-games",
+  );
+});
+
 test("Normalisasi URL: menyuntikkan parameter region pada Lootbar Free Fire", () => {
   const input = "https://lootbar.com/topup/free-fire";
   const normalized = normalizeStoreUrl(input, { id: "free-fire" });
