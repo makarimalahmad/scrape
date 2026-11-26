@@ -99,20 +99,21 @@ async function waitForProductData(page, timeout = 25_000, hostname = "") {
           () => {
             const text = document.body?.innerText || "";
             if (/pemeliharaan|maintenance/i.test(text)) return true;
+
             const denomEls = Array.from(
               document.querySelectorAll(
                 ".denom-container button, div.form-check-label-rounded-lg, button.position-relative",
               ),
             );
-            const hasDenomButton = denomEls.some((el) =>
-              /(?:diamond|roblox|gift\s*card|robux|pass|member|IDR\s*[1-9]|Rp\.?\s*[1-9])/i.test(
-                el.innerText || "",
-              ),
+            const idrInButtons = denomEls.filter((el) => /\bIDR\s*[1-9][\d.]*/i.test(el.innerText || ""));
+            if (idrInButtons.length >= 2) return true;
+
+            const denomSectionMatch = text.match(
+              /(?:pilih\s+jumlah|select\s+denomination|pilih\s+nominal)([\s\S]*?)(?:pilih\s+saluran\s+pembayaran|select\s+payment|\bcheckout\b|more\s+garena|$)/i,
             );
-            if (hasDenomButton) return true;
-            return /(?:pilih\s+jumlah|select\s+denomination)[\s\S]{0,600}?(?:diamond|roblox|gift\s*card|robux|pass|member)/i.test(
-              text,
-            );
+            const denomText = denomSectionMatch ? denomSectionMatch[1] : "";
+            const idrMatches = denomText.match(/\bIDR\s*[1-9][\d.]*/gi) || [];
+            return idrMatches.length >= 2;
           },
           null,
           { timeout, polling: 300 },

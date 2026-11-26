@@ -644,7 +644,52 @@ async function testAsync(name, fn) {
   );
 
   await testAsync(
-    "Ekstraktor UniPin Free Fire interaktif: klik tombol nominal tanpa harga langsung lalu baca harga Saluran Pembayaran",
+    "Ekstraktor UniPin Free Fire terhidrasi: bersihkan badge MOST POPULAR tanpa klik tombol",
+    async () => {
+      const hydratedFfPage = {
+        evaluate: async (_fn, arg) => {
+          if (arg && arg.selectorKartu) {
+            return [
+              { Produk: "5 Free Fire Diamonds", Harga: "IDR 1.000" },
+              { Produk: "12 Free Fire Diamonds", Harga: "IDR 2.000" },
+              { Produk: "MOST POPULAR 720 Free Fire Diamonds", Harga: "IDR 100.000" },
+            ];
+          }
+          return [];
+        },
+      };
+
+      const rows = await extractSpecialRows(
+        hydratedFfPage,
+        new URL("https://www.unipin.com/id/garena/free-fire"),
+      );
+      assert.strictEqual(rows.length, 3);
+      assert.deepStrictEqual(rows[0], { Produk: "5 Free Fire Diamonds", Harga: "IDR 1.000" });
+      assert.deepStrictEqual(rows[1], { Produk: "12 Free Fire Diamonds", Harga: "IDR 2.000" });
+      assert.deepStrictEqual(rows[2], { Produk: "720 Free Fire Diamonds", Harga: "IDR 100.000" });
+    },
+  );
+
+  await testAsync(
+    "Ekstraktor UniPin Roblox Gift Card terhidrasi: dukung badge MOST POPULAR dan harga IDR langsung",
+    async () => {
+      const hydratedRobloxPage = {
+        evaluate: async () =>
+          "1 Pilih Jumlah\nRp50.000,- Roblox Gift Card\nIDR 48.440\nMOST POPULAR\nRp100.000,- Roblox Gift Card\nIDR 96.500\n2 Pilih Saluran Pembayaran",
+      };
+
+      const rows = await extractSpecialRows(
+        hydratedRobloxPage,
+        new URL("https://www.unipin.com/id/game/roblox"),
+      );
+      assert.strictEqual(rows.length, 2);
+      assert.deepStrictEqual(rows[0], { Produk: "Roblox IDR 50.000", Harga: "IDR 48.440" });
+      assert.deepStrictEqual(rows[1], { Produk: "Roblox IDR 100.000", Harga: "IDR 96.500" });
+    },
+  );
+
+  await testAsync(
+    "Ekstraktor UniPin Free Fire interaktif: tunggu harga Saluran Pembayaran berubah (tidak ambil harga lama)",
     async () => {
       const { selectCheapestProducts } = require("../lib/matcher/product-matcher");
       const priceByDenom = {
@@ -653,15 +698,11 @@ async function testAsync(name, fn) {
         "50 Free Fire Diamonds": 8000,
       };
       let activeDenom = "";
-      let evalStep = 0;
+      let pollsSinceClick = 0;
 
       const interactiveFfPage = {
         evaluate: async (_fn, arg) => {
-          evalStep += 1;
-          if (arg && arg.selectorKartu) {
-            return [];
-          }
-          if (evalStep === 2) {
+          if (arg && typeof arg === "object") {
             return [];
           }
           if (typeof arg === "boolean") {
@@ -669,12 +710,18 @@ async function testAsync(name, fn) {
           }
           if (typeof arg === "string") {
             activeDenom = arg;
+            pollsSinceClick = 0;
             return true;
           }
           if (activeDenom && priceByDenom[activeDenom]) {
+            pollsSinceClick += 1;
+            // Simulasikan poll pertama setelah klik "12 Free Fire Diamonds" masih menampilkan harga lama (1000) walau Checkout Item sudah berubah
+            if (activeDenom === "12 Free Fire Diamonds" && pollsSinceClick === 1) {
+              return { minPrice: 1000, checkoutItem: "12 Free Fire Diamonds" };
+            }
             return { minPrice: priceByDenom[activeDenom], checkoutItem: activeDenom };
           }
-          return null;
+          return [];
         },
       };
 
@@ -718,15 +765,14 @@ async function testAsync(name, fn) {
           if (evalStep === 1) {
             return "1 Pilih Jumlah\nRp50.000,- Roblox Gift Card\nMOST POPULAR\nRp100.000,- Roblox Gift Card\n2 Pilih Saluran Pembayaran\nCheckout Total IDR 0";
           }
-          // Call 2: extractCards salah mengira nominal Rp50.000 sebagai harga dan memotong nama menjadi ",- Roblox Gift Card"
-          if (arg && arg.selectorKartu) {
-            return [
-              { Produk: ",- Roblox Gift Card", Harga: "Rp50.000" },
-              { Produk: "MOST POPULAR ,- Roblox Gift Card", Harga: "Rp100.000" },
-            ];
-          }
-          // Call 3: fallback teks kartu kosong
-          if (evalStep === 3) {
+          // Call extractCards / section inline mengembalikan [] atau label Gift Card terpotong
+          if (arg && typeof arg === "object") {
+            if (arg.selectorKartu) {
+              return [
+                { Produk: ",- Roblox Gift Card", Harga: "Rp50.000" },
+                { Produk: "MOST POPULAR ,- Roblox Gift Card", Harga: "Rp100.000" },
+              ];
+            }
             return [];
           }
           if (typeof arg === "boolean") {
@@ -740,7 +786,7 @@ async function testAsync(name, fn) {
           if (activeDenom && priceByDenom[activeDenom]) {
             return { minPrice: priceByDenom[activeDenom], checkoutItem: activeDenom };
           }
-          return null;
+          return [];
         },
       };
 
