@@ -537,6 +537,7 @@ test("Ekstraktor Khusus: STORE_EXTRACTORS mendaftarkan semua toko kunci", () => 
     "unipin.com",
     "gogogo.com",
     "tokogame.com",
+    "golrox.com",
   ];
   for (const store of targetStores) {
     assert.strictEqual(typeof STORE_EXTRACTORS[store], "function", `Ekstraktor untuk ${store} harus terdaftar sebagai fungsi`);
@@ -822,6 +823,38 @@ async function testAsync(name, fn) {
         store: "unipin.com",
         hostname: "www.unipin.com",
         url: "https://www.unipin.com/id/game/roblox",
+      });
+      assert.strictEqual(matched.size, 2);
+    },
+  );
+
+  await testAsync(
+    "Ekstraktor Golrox Roblox: ekstrak kartu .main-info dengan harga diskon aktif .discounted-price",
+    async () => {
+      const { selectCheapestProducts } = require("../lib/matcher/product-matcher");
+      const golroxMockPage = {
+        evaluate: async () => [
+          { cardText: "100", rawPrice: "15.290" },
+          { cardText: "5.000", rawPrice: "764.500" },
+        ],
+      };
+
+      const rows = await extractSpecialRows(
+        golroxMockPage,
+        new URL("https://golrox.com/beli-robux/username"),
+      );
+      assert.strictEqual(rows.length, 2);
+      assert.deepStrictEqual(rows[0], { Produk: "100 Robux", Harga: "Rp 15.290" });
+      assert.deepStrictEqual(rows[1], { Produk: "5.000 Robux", Harga: "Rp 764.500" });
+
+      const validation = validateScrapeResults("https://golrox.com/beli-robux/username", rows, "roblox");
+      assert.strictEqual(validation.valid, true);
+      assert.strictEqual(validation.validCount, 2);
+
+      const matched = selectCheapestProducts(rows, "roblox", {
+        store: "golrox.com",
+        hostname: "golrox.com",
+        url: "https://golrox.com/beli-robux/username",
       });
       assert.strictEqual(matched.size, 2);
     },
