@@ -23,7 +23,7 @@
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/makarimalahmad/scrape.git"
+    "url": "git+https://github.com/makarimalahmad/price-scraper.git"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
